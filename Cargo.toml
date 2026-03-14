@@ -4,3 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+lancedb = "0.26.2"
+onnx = "0.1.0"
+onnxruntime = "0.0.14"
+tokio = "1.50.0"
