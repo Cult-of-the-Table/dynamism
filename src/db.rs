@@ -3,14 +3,17 @@ use arrow_schema::{DataType, Field, Schema};
 use fastembed::Embedding;
 use std::sync::Arc;
 
-pub async fn data(embeds: Vec<Embedding>) {
-    let db = lancedb::connect("./db").execute().await.unwrap();
+pub async fn data(embeds: Vec<Embedding>, dir: &str) {
+    let db = lancedb::connect(("../".to_owned() + dir).as_str())
+        .execute()
+        .await
+        .unwrap();
     let schema = Arc::new(Schema::new(vec![Field::new(
         "embedding",
-        DataType::FixedSizeList(Arc::new(Field::new("item", DataType::Float32, true)), 769),
+        DataType::FixedSizeList(Arc::new(Field::new("item", DataType::Float32, true)), 768),
         true,
     )]));
-    let data = FixedSizeListArray::from_iter_primative::<Float32Type, _, _>(
+    let data = FixedSizeListArray::from_iter_primitive::<Float32Type, _, _>(
         embeds.iter().map(|s| {
             let v = s.to_vec();
             Some(v.into_iter().map(Some))
@@ -24,4 +27,20 @@ pub async fn data(embeds: Vec<Embedding>) {
         .execute()
         .await
         .unwrap();
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use anyhow::Result;
+    use tempfile::tempdir;
+    use tokio;
+    #[tokio::test]
+    async fn init() -> Result<()> {
+        let mut v: Embedding = vec![-0.04215693, -0.0008360635, -0.06397502, 0.005060206];
+        v.resize(768, 0.0);
+        let v: Vec<Embedding> = vec![v];
+        let dir = tempdir();
+        data(v, dir?.path().to_str().unwrap()).await;
+        Ok(())
+    }
 }
