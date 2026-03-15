@@ -1,12 +1,13 @@
 use anyhow::Result;
 use websearch::{
+    SearchError, SearchResult,
     multi_provider::{
         MultiProviderConfig, MultiProviderSearch, MultiProviderStrategy, SearchOptionsMulti,
     },
     providers::DuckDuckGoProvider,
 };
 
-async fn search(query: &str) -> Result<()> {
+async fn search(query: &str) -> Result<Vec<SearchResult>, SearchError> {
     let provider = DuckDuckGoProvider::new();
     let strategy = MultiProviderStrategy::Aggregate;
     let schema = MultiProviderConfig::new(strategy);
@@ -22,7 +23,7 @@ async fn search(query: &str) -> Result<()> {
             println! {"{}",v.title};
         })
     });
-    Ok(())
+    results
 }
 #[cfg(test)]
 pub mod tests {
