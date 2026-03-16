@@ -3,7 +3,7 @@ use reqwest::Response;
 use scraper::Html;
 use tokio::task::JoinSet;
 
-pub async fn parse(html: Vec<Response>) -> Result<Vec<Html>> {
+pub async fn parse(html: Vec<Response>) -> Result<Vec<String>> {
     let mut set = JoinSet::new();
     html.into_iter().for_each(|s| {
         set.spawn(async move { s.text().await.unwrap() });
@@ -12,7 +12,19 @@ pub async fn parse(html: Vec<Response>) -> Result<Vec<Html>> {
     while let Some(res) = set.join_next().await {
         downloads.push(Html::parse_document(res.unwrap().as_str()));
     }
-    Ok(downloads)
+    let text = downloads
+        .into_iter()
+        .map(|s| {
+            let text = s
+                .root_element()
+                .text()
+                .flat_map(|v| v.split_whitespace())
+                .collect::<Vec<_>>()
+                .join(" ");
+            text
+        })
+        .collect::<Vec<String>>();
+    Ok(text)
 }
 #[cfg(test)]
 pub mod tests {
@@ -32,19 +44,7 @@ pub mod tests {
         };
         let response = download(vec![search]).await.unwrap();
         let parse = parse(response).await?;
-        let text = parse
-            .into_iter()
-            .map(|s| {
-                let text = s
-                    .root_element()
-                    .text()
-                    .flat_map(|v| v.split_whitespace())
-                    .collect::<Vec<_>>()
-                    .join(" ");
-                text
-            })
-            .collect::<Vec<String>>();
-        text.iter().for_each(|s| println!("Text: {}", s));
+        parse.iter().for_each(|s| println!("Text: {}", s));
         Ok(())
     }
 }
