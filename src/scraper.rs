@@ -15,13 +15,11 @@ pub async fn parse(html: Vec<Response>) -> Result<Vec<String>> {
     let text = downloads
         .into_iter()
         .map(|s| {
-            let text = s
-                .root_element()
+            s.root_element()
                 .text()
                 .flat_map(|v| v.split_whitespace())
                 .collect::<Vec<_>>()
-                .join(" ");
-            text
+                .join(" ")
         })
         .collect::<Vec<String>>();
     Ok(text)
