@@ -2,7 +2,7 @@ use anyhow::{Error, Result};
 use reqwest::Response;
 use tokio::task::JoinSet;
 use websearch::SearchResult;
-async fn download(urls: Vec<SearchResult>) -> Result<Vec<Response>, Error> {
+pub async fn download(urls: Vec<SearchResult>) -> Result<Vec<Response>, Error> {
     let mut set = JoinSet::new();
     urls.into_iter().for_each(|s| {
         set.spawn(async move { reqwest::get(s.url).await });
@@ -21,14 +21,15 @@ pub mod tests {
     async fn init() -> Result<()> {
         let search = SearchResult {
             url: ("https://rust-lang.org/").to_string(),
-            title: "Rust".to_string(), // or String::new()
+            title: "Rust".to_string(),
             snippet: None,
             domain: None,
             published_date: None,
             provider: None,
             raw: None,
         };
-        let _ = download(vec![search]);
+        let response = download(vec![search]).await?;
+        assert_eq!(response.len(), 1);
         Ok(())
     }
 }
