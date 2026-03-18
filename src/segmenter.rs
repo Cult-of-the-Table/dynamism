@@ -1,4 +1,4 @@
-use anyhow::{Error, Result};
+use anyhow::Result;
 use icu::segmenter::SentenceSegmenter;
 use itertools::Itertools;
 
@@ -22,12 +22,10 @@ pub mod tests {
     #[test]
     fn init() {
         let text = "Hello world. This is Rust.";
-        let sentances = segment(vec![text.to_string()]);
-        sentances.iter().for_each(|s| {
-            s.iter().for_each(|v| {
-                let segments = v.iter().map(|a| a.as_str()).collect::<Vec<&str>>();
-                assert_eq!(segments, &["Hello world. ", "This is Rust."]);
-            });
+        let sentences = segment(vec![text.to_string()]).unwrap();
+        sentences.iter().for_each(|s| {
+            let segments = s.iter().map(|a| a.as_str()).collect::<Vec<&str>>();
+            assert_eq!(segments, &["Hello world. ", "This is Rust."]);
         });
     }
 }
