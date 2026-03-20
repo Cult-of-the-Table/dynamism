@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::ops::Range;
+use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -9,16 +10,16 @@ use fastembed::Embedding;
 #[derive(Clone, Debug, Default)]
 pub struct Chunk {
     pub id: Uuid,
-    pub source_url: String,
-    pub source_text: String,
+    pub source_url: Arc<String>,
+    pub source_text: Arc<String>,
     pub range: Range<usize>,
 }
 
 #[derive(Clone, Debug, Default)]
 pub struct EmbeddedChunk {
     pub id: Uuid,
-    pub source_url: String,
-    pub source_text: String,
+    pub source_url: Arc<String>,
+    pub source_text: Arc<String>,
     pub range: Range<usize>,
     pub embedding: Embedding,
 }
