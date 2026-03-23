@@ -7,7 +7,7 @@ use websearch::{
     providers::DuckDuckGoProvider,
 };
 
-async fn search(query: &str) -> Result<Vec<SearchResult>, SearchError> {
+pub async fn search(query: &str) -> Result<Vec<SearchResult>, SearchError> {
     let provider = DuckDuckGoProvider::new();
     let strategy = MultiProviderStrategy::Aggregate;
     let schema = MultiProviderConfig::new(strategy);

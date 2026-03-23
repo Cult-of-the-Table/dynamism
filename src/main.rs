@@ -1,12 +1,5 @@
 use anyhow::Result;
-
-pub mod db;
-pub mod embed;
-pub mod reqwest;
-pub mod scraper;
-pub mod segmenter;
-pub mod websearch;
-
+pub mod segmentation;
 #[tokio::main]
 async fn main() -> Result<()> {
     Ok(())

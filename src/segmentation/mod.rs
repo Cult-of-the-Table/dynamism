@@ -1,10 +1,10 @@
 use anyhow::Error;
 use fastembed::Embedding;
-use icu_segmenter::{options::SentenceBreakInvariantOptions, SentenceSegmenter};
+use icu_segmenter::{SentenceSegmenter, options::SentenceBreakInvariantOptions};
 use itertools::Itertools;
 use uuid::Uuid;
 
-use crate::embedding::embd;
+use crate::embed::embd;
 use model::{Chunk, EmbeddedChunk};
 
 pub mod model;
@@ -32,14 +32,15 @@ pub async fn segment(s: &str, source_url: &str, sigma: f64) -> Result<Vec<Embedd
         .tuple_windows()
         .map(|(i, j)| Chunk {
             id: Uuid::new_v4(),
-            source_url: source_url.to_string(),
-            source_text: s.to_string(),
+            //double check that .into() is correct
+            source_url: source_url.to_string().into(),
+            source_text: s.to_string().into(),
             range: i..j,
         })
         .collect();
 
     let texts: Vec<String> = chunks.iter().map(|c| c.chunk_text().to_string()).collect();
-    let embeddings = embd(&texts).await?;
+    let embeddings = embd(texts).await?;
 
     let embedded_chunks: Vec<EmbeddedChunk> = chunks
         .into_iter()

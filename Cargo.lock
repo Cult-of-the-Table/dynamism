@@ -4665,6 +4665,7 @@ dependencies = [
  "arrow-schema",
  "fastembed",
  "icu",
+ "icu_segmenter",
  "itertools 0.14.0",
  "lancedb",
  "ort",
@@ -4673,6 +4674,7 @@ dependencies = [
  "scraper 0.25.0",
  "tempfile",
  "tokio",
+ "uuid",
  "websearch",
 ]
 
