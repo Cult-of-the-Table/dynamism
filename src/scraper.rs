@@ -50,7 +50,10 @@ pub mod tests {
         };
         let response = download(vec![search]).await.unwrap();
         let parse = parse(response).await?;
-        parse.iter().for_each(|s| println!("Text: {}", s));
+        parse.iter().for_each(|s| {
+            let (s, _) = s;
+            println!("Text: {}", s);
+        });
         Ok(())
     }
 }

@@ -9,8 +9,15 @@ pub async fn download(urls: Vec<SearchResult>) -> Result<Vec<(Response, String)>
     });
     let mut download: Vec<(Response, String)> = Vec::new();
     while let Some(res) = set.join_next().await {
-        let (response, url) = res?;
-        download.push((response?, url.to_string()));
+        match res {
+            Ok((Ok(res), url)) => download.push((res, url.to_string())),
+            Ok((Err(e), url)) => {
+                println!("Error: {}, Failed to get url {}", e, url)
+            }
+            Err(e) => {
+                println!("Error: {}", e)
+            }
+        }
     }
     Ok(download)
 }

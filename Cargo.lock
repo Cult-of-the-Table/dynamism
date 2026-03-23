@@ -4672,6 +4672,7 @@ dependencies = [
  "readability-rust",
  "reqwest 0.13.2",
  "scraper 0.25.0",
+ "serde",
  "tempfile",
  "tokio",
  "uuid",
