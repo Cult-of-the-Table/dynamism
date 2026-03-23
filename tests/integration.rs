@@ -1,8 +1,9 @@
 use anyhow::Result;
 use main::reqwest::download;
 use main::scraper::parse;
-use main::segmenter::segment;
+//use main::segmenter::segment;
 use main::websearch::search;
+use main::segmentation::segment;
 #[tokio::test]
 async fn init() -> Result<()> {
     let query = "rust language";

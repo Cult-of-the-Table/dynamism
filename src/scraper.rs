@@ -3,25 +3,33 @@ use reqwest::Response;
 use scraper::Html;
 use tokio::task::JoinSet;
 
-pub async fn parse(html: Vec<Response>) -> Result<Vec<String>> {
+pub async fn parse(html: Vec<(Response, String)>) -> Result<Vec<(String, String)>> {
     let mut set = JoinSet::new();
     html.into_iter().for_each(|s| {
-        set.spawn(async move { s.text().await.unwrap() });
+        set.spawn(async move {
+            let (s, u) = s;
+            (s.text().await.unwrap(), u)
+        });
     });
-    let mut downloads: Vec<Html> = Vec::new();
+    let mut downloads: Vec<(Html, String)> = Vec::new();
     while let Some(res) = set.join_next().await {
-        downloads.push(Html::parse_document(res.unwrap().as_str()));
+        let (s, u) = res?;
+        downloads.push((Html::parse_document(s.as_str()), u));
     }
     let text = downloads
         .into_iter()
         .map(|s| {
-            s.root_element()
-                .text()
-                .flat_map(|v| v.split_whitespace())
-                .collect::<Vec<_>>()
-                .join(" ")
+            let (s, u) = s;
+            (
+                s.root_element()
+                    .text()
+                    .flat_map(|v| v.split_whitespace())
+                    .collect::<Vec<_>>()
+                    .join(" "),
+                u,
+            )
         })
-        .collect::<Vec<String>>();
+        .collect::<Vec<(String, String)>>();
     Ok(text)
 }
 #[cfg(test)]

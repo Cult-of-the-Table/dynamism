@@ -2,15 +2,15 @@ use anyhow::{Error, Result};
 use reqwest::Response;
 use tokio::task::JoinSet;
 use websearch::SearchResult;
-pub async fn download(urls: Vec<SearchResult>) -> Result<Vec<Response>, Error> {
+pub async fn download(urls: Vec<SearchResult>) -> Result<Vec<(Response, String)>, Error> {
     let mut set = JoinSet::new();
     urls.into_iter().for_each(|s| {
-        set.spawn(async move { reqwest::get(s.url).await });
+        set.spawn(async move { (reqwest::get(s.url.to_owned()).await, s.url.to_owned()) });
     });
-    let mut download: Vec<Response> = Vec::new();
+    let mut download: Vec<(Response, String)> = Vec::new();
     while let Some(res) = set.join_next().await {
-        let text = res??;
-        download.push(text);
+        let (response, url) = res?;
+        download.push((response?, url.to_string()));
     }
     Ok(download)
 }
