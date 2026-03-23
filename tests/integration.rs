@@ -16,7 +16,7 @@ async fn init() -> Result<()> {
     parse.into_iter().for_each(|s| {
         set.spawn(async move {
             let (s, u) = s;
-            segment(s.as_str(), u.as_str(), 0.5).await.unwrap()
+            segment(s.as_str(), u.as_str(), 0.1).await.unwrap()
         });
     });
     let mut chunks: Vec<Vec<EmbeddedChunk>> = Vec::new();

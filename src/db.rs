@@ -1,9 +1,9 @@
+use crate::segmentation::model::EmbeddedChunk;
 use arrow_array::{FixedSizeListArray, RecordBatch, RecordBatchIterator, types::Float32Type};
 use arrow_schema::{DataType, Field, Schema};
-use fastembed::Embedding;
 use std::sync::Arc;
 
-pub async fn data(embeds: Vec<Embedding>, dir: &str, name: String) {
+pub async fn data(embeds: Vec<EmbeddedChunk>, dir: &str, name: String) {
     let db = lancedb::connect(("../".to_owned() + dir).as_str())
         .execute()
         .await
@@ -15,7 +15,7 @@ pub async fn data(embeds: Vec<Embedding>, dir: &str, name: String) {
     )]));
     let data = FixedSizeListArray::from_iter_primitive::<Float32Type, _, _>(
         embeds.iter().map(|s| {
-            let v = s.to_vec();
+            let v = s.embedding.to_vec();
             Some(v.into_iter().map(Some))
         }),
         768,
@@ -32,13 +32,18 @@ pub async fn data(embeds: Vec<Embedding>, dir: &str, name: String) {
 mod tests {
     use super::*;
     use anyhow::Result;
+    use fastembed::Embedding;
     use tempfile::tempdir;
     use tokio;
     #[tokio::test]
     async fn init() -> Result<()> {
         let mut v: Embedding = vec![-0.04215693, -0.0008360635, -0.06397502, 0.005060206];
         v.resize(768, 0.0);
-        let v: Vec<Embedding> = vec![v];
+        let embed = EmbeddedChunk {
+            embedding: v,
+            ..Default::default()
+        };
+        let v: Vec<EmbeddedChunk> = vec![embed];
         let dir = tempdir()?;
         data(v, dir.path().to_str().unwrap(), ("test").to_string()).await;
         let db = lancedb::connect(("../".to_owned() + dir.path().to_str().unwrap()).as_str())
