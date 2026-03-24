@@ -8,26 +8,12 @@ use uuid::Uuid;
 use fastembed::Embedding;
 
 #[derive(Clone, Debug, Default)]
-pub struct Chunk {
-    pub id: Uuid,
-    pub source_url: Arc<String>,
-    pub source_text: Arc<String>,
-    pub range: Range<usize>,
-}
-
-#[derive(Clone, Debug, Default)]
 pub struct EmbeddedChunk {
     pub id: Uuid,
     pub source_url: Arc<String>,
     pub source_text: Arc<String>,
     pub range: Range<usize>,
     pub embedding: Embedding,
-}
-
-impl Chunk {
-    pub fn chunk_text(&self) -> &str {
-        &self.source_text[self.range.clone()]
-    }
 }
 
 impl EmbeddedChunk {

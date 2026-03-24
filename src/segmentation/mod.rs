@@ -2,10 +2,12 @@ use anyhow::Error;
 use fastembed::Embedding;
 use icu_segmenter::{SentenceSegmenter, options::SentenceBreakInvariantOptions};
 use itertools::Itertools;
+use std::ops::Range;
+use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::embed::embd;
-use model::{Chunk, EmbeddedChunk};
+use model::EmbeddedChunk;
 
 pub mod model;
 
@@ -25,34 +27,34 @@ fn cosine_similarity(a: &Embedding, b: &Embedding) -> f64 {
     dot / (mag_a * mag_b)
 }
 
-pub async fn segment(s: &str, source_url: &str, sigma: f64) -> Result<Vec<EmbeddedChunk>, Error> {
-    let segmenter = SentenceSegmenter::new(SentenceBreakInvariantOptions::default());
-    let chunks: Vec<Chunk> = segmenter
-        .segment_str(s)
-        .tuple_windows()
-        .map(|(i, j)| Chunk {
-            id: Uuid::new_v4(),
-            //double check that .into() is correct
-            source_url: source_url.to_string().into(),
-            source_text: s.to_string().into(),
-            range: i..j,
-        })
-        .collect();
-
-    let texts: Vec<String> = chunks.iter().map(|c| c.chunk_text().to_string()).collect();
-    let embeddings = embd(texts).await?;
-
-    let embedded_chunks: Vec<EmbeddedChunk> = chunks
+pub async fn chunker(source: &str, url: &str, sigma: f64) -> Result<Vec<EmbeddedChunk>, Error> {
+    let segment = segment(source).await.unwrap();
+    chunk(segment, url, source, sigma).await
+}
+async fn chunk(
+    ranges: Vec<Range<usize>>,
+    url: &str,
+    source: &str,
+    sigma: f64,
+) -> Result<Vec<EmbeddedChunk>, Error> {
+    let source = Arc::new(source.to_string());
+    let url = Arc::new(url.to_string());
+    let segments = ranges
+        .iter()
+        .map(|&Range { start, end }| source[start..end].to_string())
+        .collect::<Vec<String>>();
+    let embeds = embd(segments).await?;
+    let embedded_chunks = ranges
         .into_iter()
-        .zip(embeddings.into_iter())
-        .map(|(chunk, embedding)| EmbeddedChunk {
-            id: chunk.id,
-            source_url: chunk.source_url,
-            source_text: chunk.source_text,
-            range: chunk.range,
+        .zip(embeds.into_iter())
+        .map(|(range, embedding)| EmbeddedChunk {
+            id: Uuid::new_v4(),
+            source_url: url.clone(),
+            source_text: source.clone(),
+            range,
             embedding,
         })
-        .collect();
+        .collect::<Vec<EmbeddedChunk>>();
 
     if embedded_chunks.is_empty() {
         return Ok(vec![]);
@@ -74,4 +76,28 @@ pub async fn segment(s: &str, source_url: &str, sigma: f64) -> Result<Vec<Embedd
     }
 
     Ok(merged)
+}
+async fn segment(s: &str) -> Result<Vec<Range<usize>>, Error> {
+    let segmenter = SentenceSegmenter::new(SentenceBreakInvariantOptions::default());
+    let segments = segmenter
+        .segment_str(s)
+        .tuple_windows()
+        .map(|(i, j)| i..j)
+        .collect();
+    Ok(segments)
+}
+
+#[cfg(test)]
+pub mod tests {
+    use super::*;
+    #[tokio::test]
+    async fn seg_test() {
+        let text = "Hello world. This is Rust.";
+        let sentences = segment(text).await.unwrap();
+        let segments = sentences
+            .iter()
+            .map(|&Range { start, end }| &text[start..end])
+            .collect::<Vec<&str>>();
+        assert_eq!(segments, &["Hello world. ", "This is Rust."])
+    }
 }

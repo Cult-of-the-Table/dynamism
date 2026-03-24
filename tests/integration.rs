@@ -2,7 +2,7 @@ use anyhow::Result;
 use main::db::data;
 use main::reqwest::download;
 use main::scraper::parse;
-use main::segmentation::{model::EmbeddedChunk, segment};
+use main::segmentation::{chunker, model::EmbeddedChunk};
 use main::websearch::search;
 use tempfile::tempdir;
 use tokio::task::JoinSet;
@@ -17,7 +17,7 @@ async fn init() -> Result<()> {
     parse.into_iter().for_each(|s| {
         set.spawn(async move {
             let (s, u) = s;
-            segment(s.as_str(), u.as_str(), 0.1).await.unwrap()
+            chunker(s.as_str(), u.as_str(), 0.1).await.unwrap()
         });
     });
     let mut chunks: Vec<Vec<EmbeddedChunk>> = Vec::new();
