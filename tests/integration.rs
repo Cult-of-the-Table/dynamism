@@ -1,10 +1,11 @@
 use anyhow::Result;
+use main::db::data;
 use main::reqwest::download;
 use main::scraper::parse;
-use tokio::task::JoinSet;
-//use main::segmenter::segment;
 use main::segmentation::{model::EmbeddedChunk, segment};
 use main::websearch::search;
+use tempfile::tempdir;
+use tokio::task::JoinSet;
 #[tokio::test]
 async fn init() -> Result<()> {
     let query = "rust language";
@@ -24,8 +25,13 @@ async fn init() -> Result<()> {
         let s = res?;
         chunks.push(s);
     }
-    //sentences.iter().for_each(|s| {
-    //    s.iter().for_each(|a| println!("test: {}", a));
-    //});
+    let chunks = chunks.into_iter().flatten().collect::<Vec<EmbeddedChunk>>();
+    let dir = tempdir()?;
+    data(chunks, dir.path().to_str().unwrap(), ("test").to_string()).await;
+    let db = lancedb::connect(("../".to_owned() + dir.path().to_str().unwrap()).as_str())
+        .execute()
+        .await?;
+    let table = db.open_table("test").execute().await.unwrap();
+    let row_count = table.count_rows(None).await.unwrap();
     Ok(())
 }
