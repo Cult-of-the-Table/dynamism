@@ -4689,6 +4689,7 @@ dependencies = [
  "arrow-array",
  "arrow-schema",
  "fastembed",
+ "futures",
  "icu",
  "icu_segmenter",
  "indicatif 0.18.4",

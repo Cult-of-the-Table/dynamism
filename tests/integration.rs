@@ -1,4 +1,7 @@
 use anyhow::Result;
+use futures::{TryStreamExt, stream};
+use lancedb::index::Index;
+use lancedb::query::{self, ExecutableQuery};
 use main::db::data;
 use main::reqwest::download;
 use main::scraper::parse;
@@ -7,7 +10,7 @@ use main::websearch::search;
 use tempfile::tempdir;
 use tokio::task::JoinSet;
 #[tokio::test]
-async fn init() -> Result<()> {
+async fn init_pipe() -> Result<()> {
     let query = "rust language";
 
     let results = search(query).await?;
@@ -27,11 +30,24 @@ async fn init() -> Result<()> {
     }
     let chunks = chunks.into_iter().flatten().collect::<Vec<EmbeddedChunk>>();
     let dir = tempdir()?;
+    let first_chunk = chunks.first().map(|s| s.embedding.clone());
     data(chunks, dir.path().to_str().unwrap(), ("test").to_string()).await;
     let db = lancedb::connect(("../".to_owned() + dir.path().to_str().unwrap()).as_str())
         .execute()
         .await?;
     let table = db.open_table("test").execute().await.unwrap();
+    table
+        .create_index(&["embedding"], Index::Auto)
+        .execute()
+        .await?;
     let row_count = table.count_rows(None).await.unwrap();
+    let results = table
+        .query()
+        .nearest_to(first_chunk.unwrap())?
+        .execute()
+        .await?
+        .try_collect::<Vec<_>>()
+        .await?;
+    println!("Search results: {:?}", results);
     Ok(())
 }
