@@ -1,12 +1,26 @@
+use anyhow::Result;
 use fastembed::{EmbeddingModel, InitOptions, TextEmbedding};
-use model::*;
+
 use std::sync::mpsc::{Receiver, Sender, channel};
 
 use crate::segmentation::*;
+use model::*;
 
 pub mod model;
 
-pub fn spawn() -> (Sender<EmbeddingTask>, Receiver<EmbeddingResponse>) {
+pub async fn work(
+    task: EmbeddingTask,
+    sigma: f64,
+    model: &mut TextEmbedding,
+) -> Result<EmbeddingResponse> {
+    let EmbeddingTask { source_text, url } = task;
+
+    Ok(EmbeddingResponse {
+        chunks: chunker(&source_text, &url, sigma, model).await?,
+    })
+}
+
+pub fn spawn() -> (Sender<EmbeddingTask>, Receiver<Result<EmbeddingResponse>>) {
     let (tx, _rx) = channel();
     let (_tx, rx) = channel();
 
@@ -17,18 +31,7 @@ pub fn spawn() -> (Sender<EmbeddingTask>, Receiver<EmbeddingResponse>) {
 
     std::thread::spawn(async move || {
         loop {
-            // acquire work
-            match _rx.recv() {
-                Ok(EmbeddingTask { source_text, url }) => {
-                    _tx.send(EmbeddingResponse {
-                        chunks: chunker(&source_text, &url, 0.1, &mut model)
-                            .await
-                            .expect("Embedding should succeed"),
-                    })
-                    .expect("Embedding response should send");
-                }
-                Err(E) => panic!(),
-            }
+            _tx.send(work(_rx.recv()?, 0.1, &mut model).await)?;
         }
     });
 
