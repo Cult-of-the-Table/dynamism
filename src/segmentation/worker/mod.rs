@@ -31,7 +31,15 @@ pub fn spawn() -> (Sender<EmbeddingTask>, Receiver<Result<EmbeddingResponse>>) {
 
     std::thread::spawn(async move || {
         loop {
-            _tx.send(work(_rx.recv()?, 0.1, &mut model).await)?;
+            _tx.send(
+                work(
+                    _rx.recv().expect("Embedding task should receive"),
+                    0.1,
+                    &mut model,
+                )
+                .await,
+            )
+            .expect("Embedding response should send");
         }
     });
 
