@@ -15,20 +15,19 @@ async fn init_pipe() -> Result<()> {
 
     let results = search(query).await?;
     let response = download(results).await?;
-    let parse = parse(response).await?;
-    let mut set = JoinSet::new();
-    parse.into_iter().for_each(|s| {
-        set.spawn(async move {
-            let (s, u) = s;
-            chunker(s.as_str(), u.as_str(), 0.1).await.unwrap()
-        });
-    });
-    let mut chunks: Vec<Vec<EmbeddedChunk>> = Vec::new();
-    while let Some(res) = set.join_next().await {
-        let s = res?;
-        chunks.push(s);
+
+    for (s, u) in response {
+        let s = s.text().await.unwrap();
+        let u = u.to_string();
+        set.spawn(async move { parse((s, u)).await });
     }
-    let chunks = chunks.into_iter().flatten().collect::<Vec<EmbeddedChunk>>();
+    let mut parse = (String::new(), String::new());
+    while let Some(res) = set.join_next().await {
+        parse = res??;
+    }
+    let mut set = JoinSet::new();
+    let (s, u) = parse;
+    let chunks = chunker(s.as_str(), u.as_str(), 0.1).await.unwrap();
     let dir = tempdir()?;
     let first_chunk = chunks.first().map(|s| s.embedding.clone());
     data(chunks, dir.path().to_str().unwrap(), ("test").to_string()).await;
