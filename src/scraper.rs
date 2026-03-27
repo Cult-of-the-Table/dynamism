@@ -1,44 +1,29 @@
 use anyhow::Result;
-use reqwest::Response;
 use scraper::Html;
-use tokio::task::JoinSet;
 
-pub async fn parse(html: Vec<(Response, String)>) -> Result<Vec<(String, String)>> {
-    let mut set = JoinSet::new();
-    html.into_iter().for_each(|s| {
-        set.spawn(async move {
-            let (s, u) = s;
-            (s.text().await.unwrap(), u)
-        });
+pub async fn parse(html: (String, String)) -> Result<(String, String)> {
+    let download = Some(html).map(|(s, u)| (Html::parse_document(s.as_str()), u));
+    let text = Some(download.unwrap()).map(|(s, u)| {
+        (
+            s.root_element()
+                .text()
+                .flat_map(|s| s.split_whitespace())
+                .collect::<Vec<_>>()
+                .join(" "),
+            u,
+        )
     });
-    let mut downloads: Vec<(Html, String)> = Vec::new();
-    while let Some(res) = set.join_next().await {
-        let (s, u) = res?;
-        downloads.push((Html::parse_document(s.as_str()), u));
-    }
-    let text = downloads
-        .into_iter()
-        .map(|s| {
-            let (s, u) = s;
-            (
-                s.root_element()
-                    .text()
-                    .flat_map(|v| v.split_whitespace())
-                    .collect::<Vec<_>>()
-                    .join(" "),
-                u,
-            )
-        })
-        .collect::<Vec<(String, String)>>();
-    Ok(text)
+    Ok(text.unwrap())
 }
 #[cfg(test)]
 pub mod tests {
     use super::*;
     use crate::reqwest::download;
+    use tokio::task::JoinSet;
     use websearch::SearchResult;
     #[tokio::test]
-    async fn init() -> Result<()> {
+    async fn scraper() -> Result<()> {
+        let mut set = JoinSet::new();
         let search = SearchResult {
             url: "https://rust-lang.org/".to_string(),
             title: "Rust".to_string(),
@@ -49,11 +34,15 @@ pub mod tests {
             raw: None,
         };
         let response = download(vec![search]).await.unwrap();
-        let parse = parse(response).await?;
-        parse.iter().for_each(|s| {
-            let (s, _) = s;
+        for (s, u) in response {
+            let s = s.text().await.unwrap();
+            let u = u.to_string();
+            set.spawn(async move { parse((s, u)).await });
+        }
+        while let Some(res) = set.join_next().await {
+            let (s, _) = res??;
             println!("Text: {}", s);
-        });
+        }
         Ok(())
     }
 }
