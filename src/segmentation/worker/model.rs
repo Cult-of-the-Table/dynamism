@@ -1,13 +1,15 @@
 use std::ops::Range;
 use std::sync::Arc;
+use fastembed::Embedding;
+
+use crate::segmentation::EmbeddedChunk;
 
 pub struct EmbeddingTask {
-    text: Arc<String>,
-    range: Range<usize>,
+    pub source_text: String,
+    pub url: String,
 }
 
+
 pub struct EmbeddingResponse {
-    text: Arc<String>,
-    range: Range<usize>,
-    embedding: Embedding,
+    pub chunks: Vec<EmbeddedChunk>,
 }

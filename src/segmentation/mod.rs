@@ -1,5 +1,5 @@
 use anyhow::Error;
-use fastembed::Embedding;
+use fastembed::{Embedding, TextEmbedding};
 use icu_segmenter::{SentenceSegmenter, options::SentenceBreakInvariantOptions};
 use itertools::Itertools;
 use std::ops::Range;
@@ -28,15 +28,21 @@ fn cosine_similarity(a: &Embedding, b: &Embedding) -> f64 {
     dot / (mag_a * mag_b)
 }
 
-pub async fn chunker(source: &str, url: &str, sigma: f64) -> Result<Vec<EmbeddedChunk>, Error> {
+pub async fn chunker(
+    source: &str,
+    url: &str,
+    sigma: f64,
+    model: &mut TextEmbedding,
+) -> Result<Vec<EmbeddedChunk>, Error> {
     let segment = segment(source).await.unwrap();
-    chunk(segment, url, source, sigma).await
+    chunk(segment, url, source, sigma, model).await
 }
 async fn chunk(
     ranges: Vec<Range<usize>>,
     url: &str,
     source: &str,
     sigma: f64,
+    model: &mut TextEmbedding,
 ) -> Result<Vec<EmbeddedChunk>, Error> {
     let source = Arc::new(source.to_string());
     let url = Arc::new(url.to_string());
@@ -44,10 +50,12 @@ async fn chunk(
         .iter()
         .map(|&Range { start, end }| source[start..end].to_string())
         .collect::<Vec<String>>();
-    let embeds = embd(segments).await?;
+    let embeds = model
+        .embed(segments, None)
+        .inspect(|s| println!("Embeddings length: {}", s.len()));
     let embedded_chunks = ranges
         .into_iter()
-        .zip(embeds.into_iter())
+        .zip(embeds.into_iter().flatten())
         .map(|(range, embedding)| EmbeddedChunk {
             id: Uuid::new_v4(),
             source_url: url.clone(),
