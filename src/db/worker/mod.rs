@@ -35,27 +35,27 @@ pub async fn work(schema: Arc<Schema>, table: &Table, chunks: Vec<EmbeddedChunk>
     table.add(batch_iter).execute().await.unwrap();
 }
 
-pub async fn spawn(input_channel: Receiver<Result<EmbeddingResponse>>, dir: &str, name: &str) {
-    let db = lancedb::connect(("../".to_owned() + dir).as_str())
-        .execute()
-        .await
-        .unwrap();
-    let schema = Arc::new(Schema::new(vec![
-        Field::new(
-            "embedding",
-            DataType::FixedSizeList(Arc::new(Field::new("item", DataType::Float32, true)), 768),
-            true,
-        ),
-        Field::new("url", DataType::Utf8, false),
-        Field::new("text", DataType::Utf8, false),
-    ]));
-    let table = db
-        .create_empty_table(name, schema.clone())
-        .execute()
-        .await
-        .unwrap();
-
+pub fn spawn(input_channel: Receiver<Result<EmbeddingResponse>>, dir: String, name: String) {
     std::thread::spawn(async move || {
+        let db = lancedb::connect(("../".to_owned() + &dir).as_str())
+            .execute()
+            .await
+            .unwrap();
+        let schema = Arc::new(Schema::new(vec![
+            Field::new(
+                "embedding",
+                DataType::FixedSizeList(Arc::new(Field::new("item", DataType::Float32, true)), 768),
+                true,
+            ),
+            Field::new("url", DataType::Utf8, false),
+            Field::new("text", DataType::Utf8, false),
+        ]));
+        let table = db
+            .create_empty_table(name, schema.clone())
+            .execute()
+            .await
+            .unwrap();
+
         loop {
             let EmbeddingResponse { chunks } = input_channel
                 .recv()
