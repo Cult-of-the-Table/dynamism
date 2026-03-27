@@ -10,6 +10,7 @@ use crate::embed::embd;
 use model::EmbeddedChunk;
 
 pub mod model;
+pub mod worker;
 
 fn cosine_similarity(a: &Embedding, b: &Embedding) -> f64 {
     let a: &[f32] = a;
