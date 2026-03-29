@@ -6,7 +6,6 @@ use std::ops::Range;
 use std::sync::Arc;
 use uuid::Uuid;
 
-use crate::embed::embd;
 use model::EmbeddedChunk;
 
 pub mod model;
@@ -44,6 +43,7 @@ async fn chunk(
     sigma: f64,
     model: &mut TextEmbedding,
 ) -> Result<Vec<EmbeddedChunk>, Error> {
+    println!("Chunk function start");
     let source = Arc::new(source.to_string());
     let url = Arc::new(url.to_string());
     let segments = ranges
@@ -53,6 +53,7 @@ async fn chunk(
     let embeds = model
         .embed(segments, None)
         .inspect(|s| println!("Embeddings length: {}", s.len()));
+
     let embedded_chunks = ranges
         .into_iter()
         .zip(embeds.into_iter().flatten())

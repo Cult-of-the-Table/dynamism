@@ -13,6 +13,7 @@ pub async fn work(
     sigma: f64,
     model: &mut TextEmbedding,
 ) -> Result<EmbeddingResponse> {
+    println!("work started");
     let EmbeddingTask { source_text, url } = task;
 
     Ok(EmbeddingResponse {
@@ -21,6 +22,7 @@ pub async fn work(
 }
 
 pub fn spawn() -> (Sender<EmbeddingTask>, Receiver<Result<EmbeddingResponse>>) {
+    println!("Spawn start");
     let (tx, _rx) = channel();
     let (_tx, rx) = channel();
 
@@ -28,8 +30,10 @@ pub fn spawn() -> (Sender<EmbeddingTask>, Receiver<Result<EmbeddingResponse>>) {
         InitOptions::new(EmbeddingModel::NomicEmbedTextV15).with_show_download_progress(true),
     )
     .unwrap();
+    println!("model loaded");
 
     std::thread::spawn(async move || {
+        println!("thread spawned");
         loop {
             _tx.send(
                 work(

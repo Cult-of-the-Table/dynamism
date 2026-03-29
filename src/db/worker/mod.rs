@@ -1,17 +1,12 @@
-use crate::segmentation::chunker;
 use crate::segmentation::model::EmbeddedChunk;
-use crate::segmentation::worker::model::{EmbeddingResponse, EmbeddingTask};
+use crate::segmentation::worker::model::EmbeddingResponse;
 use anyhow::Result;
 use arrow_array::types::Float32Type;
 use arrow_array::{FixedSizeListArray, RecordBatch, RecordBatchIterator, StringArray};
 use arrow_schema::{DataType, Field, Schema};
-use fastembed::{EmbeddingModel, InitOptions, TextEmbedding};
-use itertools::Itertools;
-use lancedb::arrow::SimpleRecordBatchReader;
-use lancedb::table::AddDataBuilder;
-use lancedb::{Connection, Table};
+use lancedb::Table;
 use std::sync::Arc;
-use std::sync::mpsc::{Receiver, Sender, channel};
+use std::sync::mpsc::Receiver;
 
 pub async fn work(schema: Arc<Schema>, table: &Table, chunks: Vec<EmbeddedChunk>) {
     let embeds = FixedSizeListArray::from_iter_primitive::<Float32Type, _, _>(
