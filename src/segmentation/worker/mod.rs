@@ -1,7 +1,8 @@
 use anyhow::Result;
 use fastembed::{EmbeddingModel, InitOptions, TextEmbedding};
+use tokio::sync::mpsc::{Receiver, Sender, channel};
 
-use std::sync::mpsc::{Receiver, Sender, channel};
+//use std::sync::mpsc::{Receiver, Sender, channel};
 
 use crate::segmentation::*;
 use model::*;
@@ -23,8 +24,8 @@ pub async fn work(
 
 pub fn spawn() -> (Sender<EmbeddingTask>, Receiver<Result<EmbeddingResponse>>) {
     println!("Spawn start");
-    let (tx, _rx) = channel();
-    let (_tx, rx) = channel();
+    let (tx, mut _rx) = channel(10);
+    let (_tx, rx) = channel(10);
 
     let mut model = TextEmbedding::try_new(
         InitOptions::new(EmbeddingModel::NomicEmbedTextV15).with_show_download_progress(true),
@@ -32,18 +33,10 @@ pub fn spawn() -> (Sender<EmbeddingTask>, Receiver<Result<EmbeddingResponse>>) {
     .unwrap();
     println!("model loaded");
 
-    std::thread::spawn(async move || {
+    tokio::spawn(async move {
         println!("thread spawned");
-        loop {
-            _tx.send(
-                work(
-                    _rx.recv().expect("Embedding task should receive"),
-                    0.1,
-                    &mut model,
-                )
-                .await,
-            )
-            .expect("Embedding response should send");
+        while let Some(msg) = _rx.recv().await {
+            _tx.send(work(msg, 0.1, &mut model).await).await.unwrap();
         }
     });
 

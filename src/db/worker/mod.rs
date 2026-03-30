@@ -6,7 +6,7 @@ use arrow_array::{FixedSizeListArray, RecordBatch, RecordBatchIterator, StringAr
 use arrow_schema::{DataType, Field, Schema};
 use lancedb::Table;
 use std::sync::Arc;
-use std::sync::mpsc::Receiver;
+use tokio::sync::mpsc::Receiver;
 
 pub async fn work(schema: Arc<Schema>, table: &Table, chunks: Vec<EmbeddedChunk>) {
     let embeds = FixedSizeListArray::from_iter_primitive::<Float32Type, _, _>(
@@ -30,7 +30,7 @@ pub async fn work(schema: Arc<Schema>, table: &Table, chunks: Vec<EmbeddedChunk>
     table.add(batch_iter).execute().await.unwrap();
 }
 
-pub fn spawn(input_channel: Receiver<Result<EmbeddingResponse>>, dir: String, name: String) {
+pub fn spawn(mut input_channel: Receiver<Result<EmbeddingResponse>>, dir: String, name: String) {
     std::thread::spawn(async move || {
         let db = lancedb::connect(("../".to_owned() + &dir).as_str())
             .execute()
@@ -52,10 +52,7 @@ pub fn spawn(input_channel: Receiver<Result<EmbeddingResponse>>, dir: String, na
             .unwrap();
 
         loop {
-            let EmbeddingResponse { chunks } = input_channel
-                .recv()
-                .expect("Should receive input embeddings")
-                .expect("EmbeddingResponse should be valid (wip)");
+            let EmbeddingResponse { chunks } = input_channel.recv().await.unwrap().unwrap();
 
             work(schema.clone(), &table, chunks).await
         }

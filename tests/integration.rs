@@ -31,7 +31,7 @@ async fn init_pipe() -> Result<()> {
     };
 
     let (tx, rx) = dynamism::segmentation::worker::spawn();
-    tx.send(task);
+    tx.send(task).await.unwrap();
     let dir = tempdir()?;
     spawn(
         rx,
