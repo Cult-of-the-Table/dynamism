@@ -4,10 +4,8 @@ use dynamism::reqwest::download;
 use dynamism::scraper::parse;
 use dynamism::segmentation::worker::model::EmbeddingTask;
 use dynamism::websearch::search;
-use std::time::Duration;
 use tempfile::tempdir;
 use tokio::task::JoinSet;
-use tokio::time::sleep;
 #[tokio::test]
 async fn init_pipe() -> Result<()> {
     let query = "rust language";
@@ -30,14 +28,16 @@ async fn init_pipe() -> Result<()> {
         url: parse.1,
     };
 
-    let (tx, rx) = dynamism::segmentation::worker::spawn();
+    let (tx, rx, seg_handle) = dynamism::segmentation::worker::spawn();
     tx.send(task).await.unwrap();
+    drop(tx);
     let dir = tempdir()?;
-    spawn(
+    let db_handle = spawn(
         rx,
         dir.path().to_str().unwrap().to_string(),
         "test".to_string(),
     );
-    sleep(Duration::new(10, 0)).await;
+    db_handle.await.unwrap();
+    seg_handle.await.unwrap();
     Ok(())
 }
