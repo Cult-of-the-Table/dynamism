@@ -6,7 +6,9 @@ use std::ops::Range;
 use std::sync::Arc;
 use uuid::Uuid;
 
+use crate::telemetry::TelEvent;
 use model::EmbeddedChunk;
+use tokio::sync::mpsc::Sender;
 
 pub mod model;
 pub mod worker;
@@ -32,9 +34,10 @@ pub async fn chunker(
     url: &str,
     sigma: f64,
     model: &mut TextEmbedding,
+    tel: Sender<TelEvent>,
 ) -> Result<Vec<EmbeddedChunk>, Error> {
     let segment = segment(source).await.unwrap();
-    chunk(segment, url, source, sigma, model).await
+    chunk(segment, url, source, sigma, model, tel.clone()).await
 }
 async fn chunk(
     ranges: Vec<Range<usize>>,
@@ -42,6 +45,7 @@ async fn chunk(
     source: &str,
     sigma: f64,
     model: &mut TextEmbedding,
+    tel: Sender<TelEvent>,
 ) -> Result<Vec<EmbeddedChunk>, Error> {
     println!("Chunk function start");
     let source = Arc::new(source.to_string());
@@ -50,6 +54,10 @@ async fn chunk(
         .iter()
         .map(|&Range { start, end }| source[start..end].to_string())
         .collect::<Vec<String>>();
+    tel.send(TelEvent::NewData(segments.len() as u64))
+        .await
+        .unwrap();
+
     let embeds = model
         .embed(segments, None)
         .inspect(|s| println!("Embeddings length: {}", s.len()));
