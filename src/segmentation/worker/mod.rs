@@ -1,6 +1,7 @@
 use anyhow::Result;
 use fastembed::{EmbeddingModel, InitOptions, TextEmbedding};
 use tokio::sync::mpsc::{Receiver, Sender, channel};
+use tokio::task::JoinHandle;
 
 //use std::sync::mpsc::{Receiver, Sender, channel};
 
@@ -22,7 +23,11 @@ pub async fn work(
     })
 }
 
-pub fn spawn() -> (Sender<EmbeddingTask>, Receiver<Result<EmbeddingResponse>>) {
+pub fn spawn() -> (
+    Sender<EmbeddingTask>,
+    Receiver<Result<EmbeddingResponse>>,
+    JoinHandle<()>,
+) {
     println!("Spawn start");
     let (tx, mut _rx) = channel(10);
     let (_tx, rx) = channel(10);
@@ -33,12 +38,12 @@ pub fn spawn() -> (Sender<EmbeddingTask>, Receiver<Result<EmbeddingResponse>>) {
     .unwrap();
     println!("model loaded");
 
-    tokio::spawn(async move {
+    let handle = tokio::spawn(async move {
         println!("thread spawned");
         while let Some(msg) = _rx.recv().await {
-            _tx.send(work(msg, 0.1, &mut model).await).await.unwrap();
+            dbg!(_tx.send(work(msg, 0.1, &mut model).await).await).unwrap();
         }
     });
 
-    (tx, rx)
+    (tx, rx, handle)
 }

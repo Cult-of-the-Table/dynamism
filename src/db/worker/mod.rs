@@ -7,6 +7,7 @@ use arrow_schema::{DataType, Field, Schema};
 use lancedb::Table;
 use std::sync::Arc;
 use tokio::sync::mpsc::Receiver;
+use tokio::task::JoinHandle;
 
 pub async fn work(schema: Arc<Schema>, table: &Table, chunks: Vec<EmbeddedChunk>) {
     let embeds = FixedSizeListArray::from_iter_primitive::<Float32Type, _, _>(
@@ -30,8 +31,12 @@ pub async fn work(schema: Arc<Schema>, table: &Table, chunks: Vec<EmbeddedChunk>
     table.add(batch_iter).execute().await.unwrap();
 }
 
-pub fn spawn(mut input_channel: Receiver<Result<EmbeddingResponse>>, dir: String, name: String) {
-    std::thread::spawn(async move || {
+pub fn spawn(
+    mut input_channel: Receiver<Result<EmbeddingResponse>>,
+    dir: String,
+    name: String,
+) -> JoinHandle<()> {
+    let handle = tokio::spawn(async move {
         let db = lancedb::connect(("../".to_owned() + &dir).as_str())
             .execute()
             .await
@@ -51,10 +56,9 @@ pub fn spawn(mut input_channel: Receiver<Result<EmbeddingResponse>>, dir: String
             .await
             .unwrap();
 
-        loop {
-            let EmbeddingResponse { chunks } = input_channel.recv().await.unwrap().unwrap();
-
-            work(schema.clone(), &table, chunks).await
+        while let Some(Ok(EmbeddingResponse { chunks })) = input_channel.recv().await {
+            work(schema.clone(), &table, chunks).await;
         }
     });
+    handle
 }
