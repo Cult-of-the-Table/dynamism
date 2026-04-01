@@ -44,7 +44,7 @@ pub fn spawn(
     tokio::spawn(async move {
         println!("embed started");
         let mut buff: Vec<Batch> = Vec::new();
-        while e_rx.recv_many(&mut buff, 8).await > 0 {
+        while e_rx.recv_many(&mut buff, 1).await > 0 {
             let text = buff.iter().map(|s| s.text.as_str()).collect::<Vec<&str>>();
             if let Ok(embedding) = model.embed(text, None) {
                 tel2.send(TelEvent::ProcessedData(buff.len() as u64))
