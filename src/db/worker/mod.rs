@@ -1,13 +1,12 @@
 use crate::segmentation::model::EmbeddedChunk;
 use crate::segmentation::worker::model::EmbeddingResponse;
-use crate::telemetry::TelEvent;
 use anyhow::Result;
 use arrow_array::types::Float32Type;
 use arrow_array::{FixedSizeListArray, RecordBatch, RecordBatchIterator, StringArray};
 use arrow_schema::{DataType, Field, Schema};
 use lancedb::Table;
 use std::sync::Arc;
-use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::sync::mpsc::Receiver;
 use tokio::task::JoinHandle;
 
 pub async fn work(schema: Arc<Schema>, table: &Table, chunks: Vec<EmbeddedChunk>) {
@@ -36,9 +35,8 @@ pub fn spawn(
     mut input_channel: Receiver<Result<EmbeddingResponse>>,
     dir: String,
     name: String,
-    tel: Sender<TelEvent>,
 ) -> JoinHandle<()> {
-    let handle = tokio::spawn(async move {
+    tokio::spawn(async move {
         let db = lancedb::connect(("../".to_owned() + &dir).as_str())
             .execute()
             .await
@@ -59,12 +57,7 @@ pub fn spawn(
             .unwrap();
 
         while let Some(Ok(EmbeddingResponse { chunks })) = input_channel.recv().await {
-            let count = chunks.len();
             work(schema.clone(), &table, chunks).await;
-            tel.send(TelEvent::ProcessedData(count as u64))
-                .await
-                .unwrap();
         }
-    });
-    handle
+    })
 }
