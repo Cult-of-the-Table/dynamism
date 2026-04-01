@@ -1,5 +1,8 @@
+use std::time::Duration;
+
 use anyhow::Result;
 use fastembed::{EmbeddingModel, InitOptions, TextEmbedding};
+use indicatif::{ProgressBar, ProgressDrawTarget, ProgressStyle};
 use tokio::sync::mpsc::{Receiver, Sender, channel};
 use tokio::task::JoinHandle;
 
@@ -66,7 +69,13 @@ pub fn spawn(
             let e_tx = e_tx.clone();
             let tel = tel.clone();
             tokio::spawn(async move {
+                let spinner = ProgressBar::with_draw_target(None, ProgressDrawTarget::hidden());
+                spinner.set_style(ProgressStyle::default_spinner());
+                let _ = tel.send(TelEvent::Spinner(spinner.clone())).await;
+                spinner.enable_steady_tick(Duration::from_millis(100));
+                spinner.set_message("test");
                 _tx.send(work(msg, 0.1, e_tx, tel).await).await.unwrap();
+                spinner.finish();
             });
         }
         drop(tel);
