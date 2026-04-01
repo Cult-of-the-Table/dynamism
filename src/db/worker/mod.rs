@@ -36,7 +36,7 @@ pub fn spawn(
     dir: String,
     name: String,
 ) -> JoinHandle<()> {
-    let handle = tokio::spawn(async move {
+    tokio::spawn(async move {
         let db = lancedb::connect(("../".to_owned() + &dir).as_str())
             .execute()
             .await
@@ -59,6 +59,5 @@ pub fn spawn(
         while let Some(Ok(EmbeddingResponse { chunks })) = input_channel.recv().await {
             work(schema.clone(), &table, chunks).await;
         }
-    });
-    handle
+    })
 }

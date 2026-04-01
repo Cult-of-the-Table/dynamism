@@ -1,12 +1,16 @@
 use anyhow::Error;
-use fastembed::{Embedding, TextEmbedding};
+use fastembed::Embedding;
+use futures::future::try_join_all;
 use icu_segmenter::{SentenceSegmenter, options::SentenceBreakInvariantOptions};
 use itertools::Itertools;
 use std::ops::Range;
 use std::sync::Arc;
 use uuid::Uuid;
 
+use crate::telemetry::TelEvent;
 use model::EmbeddedChunk;
+use tokio::sync::mpsc::Sender;
+use tokio::{self, sync};
 
 pub mod model;
 pub mod worker;
@@ -27,36 +31,55 @@ fn cosine_similarity(a: &Embedding, b: &Embedding) -> f64 {
     dot / (mag_a * mag_b)
 }
 
+pub struct Batch {
+    text: String,
+    reply: sync::oneshot::Sender<Embedding>,
+}
 pub async fn chunker(
     source: &str,
     url: &str,
     sigma: f64,
-    model: &mut TextEmbedding,
+    e_tx: Sender<Batch>,
+    tel: Sender<TelEvent>,
 ) -> Result<Vec<EmbeddedChunk>, Error> {
     let segment = segment(source).await.unwrap();
-    chunk(segment, url, source, sigma, model).await
+    chunk(segment, url, source, sigma, e_tx.clone(), tel.clone()).await
 }
 async fn chunk(
     ranges: Vec<Range<usize>>,
     url: &str,
     source: &str,
     sigma: f64,
-    model: &mut TextEmbedding,
+    e_tx: Sender<Batch>,
+    tel: Sender<TelEvent>,
 ) -> Result<Vec<EmbeddedChunk>, Error> {
-    println!("Chunk function start");
+    //println!("Chunk function start");
     let source = Arc::new(source.to_string());
     let url = Arc::new(url.to_string());
     let segments = ranges
         .iter()
         .map(|&Range { start, end }| source[start..end].to_string())
         .collect::<Vec<String>>();
-    let embeds = model
-        .embed(segments, None)
-        .inspect(|s| println!("Embeddings length: {}", s.len()));
+    tel.send(TelEvent::NewData(segments.len() as u64))
+        .await
+        .unwrap();
+
+    let mut receivers = Vec::with_capacity(segments.len());
+
+    for seg in segments {
+        let (r_tx, r_rx) = tokio::sync::oneshot::channel();
+        let msg = Batch {
+            text: seg,
+            reply: r_tx,
+        };
+        e_tx.send(msg).await?;
+        receivers.push(r_rx);
+    }
+    let embeds = try_join_all(receivers).await.unwrap();
 
     let embedded_chunks = ranges
         .into_iter()
-        .zip(embeds.into_iter().flatten())
+        .zip(embeds)
         .map(|(range, embedding)| EmbeddedChunk {
             id: Uuid::new_v4(),
             source_url: url.clone(),

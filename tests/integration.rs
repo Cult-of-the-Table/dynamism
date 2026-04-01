@@ -6,7 +6,7 @@ use dynamism::segmentation::worker::model::EmbeddingTask;
 use dynamism::websearch::search;
 use tempfile::tempdir;
 use tokio::task::JoinSet;
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn init_pipe() -> Result<()> {
     let query = "rust language";
 
@@ -28,7 +28,8 @@ async fn init_pipe() -> Result<()> {
         url: parse.1,
     };
 
-    let (tx, rx, seg_handle) = dynamism::segmentation::worker::spawn();
+    let (tel, tel_handle) = dynamism::telemetry::spawn();
+    let (tx, rx, seg_handle) = dynamism::segmentation::worker::spawn(tel.clone());
     tx.send(task).await.unwrap();
     drop(tx);
     let dir = tempdir()?;
@@ -37,7 +38,9 @@ async fn init_pipe() -> Result<()> {
         dir.path().to_str().unwrap().to_string(),
         "test".to_string(),
     );
+    drop(tel);
     db_handle.await.unwrap();
     seg_handle.await.unwrap();
+    tel_handle.await.unwrap();
     Ok(())
 }
