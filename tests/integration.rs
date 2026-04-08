@@ -3,6 +3,7 @@ use dynamism::db::worker::spawn;
 use dynamism::reqwest::download;
 use dynamism::scraper::parse;
 use dynamism::segmentation::worker::model::EmbeddingTask;
+use dynamism::umap::umap;
 use dynamism::websearch::search;
 use tempfile::tempdir;
 use tokio::task::JoinSet;
@@ -32,9 +33,11 @@ async fn init_pipe() -> Result<()> {
     let (tx, rx, seg_handle) = dynamism::segmentation::worker::spawn(tel.clone());
     tx.send(task).await.unwrap();
     drop(tx);
+
+    let fitted_chunks = umap(rx).await?;
     let dir = tempdir()?;
     let db_handle = spawn(
-        rx,
+        fitted_chunks,
         dir.path().to_str().unwrap().to_string(),
         "test".to_string(),
     );
