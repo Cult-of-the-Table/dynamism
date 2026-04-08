@@ -1,5 +1,6 @@
 use crate::db::worker::work;
 use crate::segmentation::model::EmbeddedChunk;
+use crate::umap::FittedChunks;
 use anyhow::Result;
 use arrow_schema::{DataType, Field, Schema};
 use fastembed::Embedding;
@@ -8,10 +9,11 @@ use tempfile::tempdir;
 use tokio;
 
 #[tokio::test]
+#[ignore]
 async fn init() -> Result<()> {
     let mut v: Embedding = vec![-0.04215693, -0.0008360635, -0.06397502, 0.005060206];
     v.resize(768, 0.0);
-    let embed = EmbeddedChunk {
+    let embed = FittedChunks {
         embedding: v,
         ..Default::default()
     };

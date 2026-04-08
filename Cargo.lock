@@ -3596,6 +3596,7 @@ dependencies = [
  "anyhow",
  "arrow-array",
  "arrow-schema",
+ "burn",
  "fast-umap",
  "fastembed",
  "futures",
