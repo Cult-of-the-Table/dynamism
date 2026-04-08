@@ -1,24 +1,21 @@
-use crate::segmentation::model::EmbeddedChunk;
-use crate::segmentation::worker::model::EmbeddingResponse;
-use anyhow::Result;
-use arrow_array::types::Float32Type;
+use crate::umap::FittedChunks;
+use arrow_array::types::Float64Type;
 use arrow_array::{FixedSizeListArray, RecordBatch, RecordBatchIterator, StringArray};
 use arrow_schema::{DataType, Field, Schema};
 use lancedb::Table;
 use std::sync::Arc;
-use tokio::sync::mpsc::Receiver;
 use tokio::task::JoinHandle;
 
-pub async fn work(schema: Arc<Schema>, table: &Table, chunks: Vec<EmbeddedChunk>) {
-    let embeds = FixedSizeListArray::from_iter_primitive::<Float32Type, _, _>(
+pub async fn work(schema: Arc<Schema>, table: &Table, chunks: Vec<FittedChunks>) {
+    let embeds = FixedSizeListArray::from_iter_primitive::<Float64Type, _, _>(
         chunks.iter().map(|s| {
-            let v = s.embedding.to_vec();
+            let v = s.embeds.to_vec();
             Some(v.into_iter().map(Some))
         }),
-        768,
+        3,
     );
-    let urls = StringArray::from_iter_values(chunks.iter().map(|s| s.source_url.to_string()));
-    let text = StringArray::from_iter_values(chunks.iter().map(|s| s.source_text.to_string()));
+    let urls = StringArray::from_iter_values(chunks.iter().map(|s| s.url.to_string()));
+    let text = StringArray::from_iter_values(chunks.iter().map(|s| s.text.to_string()));
 
     let batch = RecordBatch::try_new(
         schema.clone(),
@@ -31,11 +28,7 @@ pub async fn work(schema: Arc<Schema>, table: &Table, chunks: Vec<EmbeddedChunk>
     table.add(batch_iter).execute().await.unwrap();
 }
 
-pub fn spawn(
-    mut input_channel: Receiver<Result<EmbeddingResponse>>,
-    dir: String,
-    name: String,
-) -> JoinHandle<()> {
+pub fn spawn(chunks: Vec<FittedChunks>, dir: String, name: String) -> JoinHandle<()> {
     tokio::spawn(async move {
         let db = lancedb::connect(("../".to_owned() + &dir).as_str())
             .execute()
@@ -44,7 +37,7 @@ pub fn spawn(
         let schema = Arc::new(Schema::new(vec![
             Field::new(
                 "embedding",
-                DataType::FixedSizeList(Arc::new(Field::new("item", DataType::Float32, true)), 768),
+                DataType::FixedSizeList(Arc::new(Field::new("item", DataType::Float64, true)), 3),
                 true,
             ),
             Field::new("url", DataType::Utf8, false),
@@ -56,8 +49,6 @@ pub fn spawn(
             .await
             .unwrap();
 
-        while let Some(Ok(EmbeddingResponse { chunks })) = input_channel.recv().await {
-            work(schema.clone(), &table, chunks).await;
-        }
+        work(schema.clone(), &table, chunks).await;
     })
 }
