@@ -31,17 +31,18 @@ async fn init_pipe() -> Result<()> {
     });
 
     let (tel, tel_handle) = dynamism::telemetry::spawn();
-    let (tx, rx, seg_handle) = dynamism::segmentation::worker::spawn(tel.clone());
+    let (tx, rx, seg_handle) = dynamism::segmentation::worker::spawn(tel.clone()).await;
     for t in task {
         tx.send(t).await.unwrap();
     }
+    drop(tx);
+    let fitted_chunks = umap(rx, tel.clone()).await?;
     let dir = tempdir()?;
     let db_handle = spawn(
         fitted_chunks,
         dir.path().to_str().unwrap().to_string(),
         "test".to_string(),
     );
-    drop(tx);
     drop(tel);
     db_handle.await.unwrap();
     seg_handle.await.unwrap();
