@@ -9,7 +9,7 @@ use tempfile::tempdir;
 use tokio::task::JoinSet;
 #[tokio::test(flavor = "multi_thread")]
 async fn init_pipe() -> Result<()> {
-    let query = "rust language";
+    let query = "ladder recursive training";
 
     let mut set = JoinSet::new();
     let results = search(query).await?;

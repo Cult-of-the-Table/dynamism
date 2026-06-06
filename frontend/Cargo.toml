@@ -1,0 +1,10 @@
+[package]
+name = "frontend"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+dynamism = { path = "../dynamism"}
+futures = "0.3.32"
+iced = "0.14.0"
+tokio = "1.52.1"

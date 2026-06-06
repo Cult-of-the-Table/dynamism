@@ -4,14 +4,14 @@ use websearch::{
     multi_provider::{
         MultiProviderConfig, MultiProviderSearch, MultiProviderStrategy, SearchOptionsMulti,
     },
-    providers::DuckDuckGoProvider,
+    providers::{ArxivProvider, DuckDuckGoProvider},
 };
 
 pub async fn search(query: &str) -> Result<Vec<SearchResult>, SearchError> {
-    let provider = DuckDuckGoProvider::new();
     let strategy = MultiProviderStrategy::Aggregate;
     let schema = MultiProviderConfig::new(strategy);
-    let schema = schema.add_provider(Box::new(provider));
+    let schema = schema.add_provider(Box::new(ArxivProvider::new()));
+    let schema = schema.add_provider(Box::new(DuckDuckGoProvider::new()));
     let mut multi = MultiProviderSearch::new(schema);
     let search = SearchOptionsMulti {
         query: query.to_string(),
