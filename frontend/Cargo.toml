@@ -7,4 +7,5 @@ edition = "2024"
 dynamism = { path = "../dynamism"}
 futures = "0.3.32"
 iced = "0.14.0"
+iced_plot = "0.4.0"
 tokio = "1.52.1"
