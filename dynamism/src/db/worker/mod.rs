@@ -9,10 +9,10 @@ use tokio::task::JoinHandle;
 pub async fn work(schema: Arc<Schema>, table: &Table, chunks: Vec<FittedChunks>) {
     let embeds = FixedSizeListArray::from_iter_primitive::<Float64Type, _, _>(
         chunks.iter().map(|s| {
-            let v = s.embeds.to_vec();
+            let v: [f64; 2] = s.embeds.into();
             Some(v.into_iter().map(Some))
         }),
-        3,
+        2,
     );
     let urls = StringArray::from_iter_values(chunks.iter().map(|s| s.url.to_string()));
     let text = StringArray::from_iter_values(chunks.iter().map(|s| s.text.to_string()));
@@ -37,7 +37,7 @@ pub fn spawn(chunks: Vec<FittedChunks>, dir: String, name: String) -> JoinHandle
         let schema = Arc::new(Schema::new(vec![
             Field::new(
                 "embedding",
-                DataType::FixedSizeList(Arc::new(Field::new("item", DataType::Float64, true)), 3),
+                DataType::FixedSizeList(Arc::new(Field::new("item", DataType::Float64, true)), 2),
                 true,
             ),
             Field::new("url", DataType::Utf8, false),

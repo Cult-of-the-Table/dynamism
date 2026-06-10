@@ -11,6 +11,13 @@ pub fn main() -> iced::Result {
 enum Message {
     Welcome,
 }
+#[derive(Debug, Clone)]
+pub struct PointData {
+    pub x: f64,
+    pub y: f64,
+    pub url: String,
+    pub text: String,
+}
 
 struct Dynamism {}
 
