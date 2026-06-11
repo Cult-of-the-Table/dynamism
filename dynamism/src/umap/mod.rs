@@ -14,8 +14,8 @@ pub struct FittedChunks {
 }
 #[derive(Copy, Clone, Debug, Default)]
 pub struct Coords {
-    x: f64,
-    y: f64,
+    pub x: f64,
+    pub y: f64,
 }
 impl From<Coords> for [f64; 2] {
     fn from(c: Coords) -> Self {

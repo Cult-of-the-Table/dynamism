@@ -4560,10 +4560,12 @@ dependencies = [
 name = "frontend"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "dynamism",
  "futures",
  "iced",
  "iced_plot",
+ "tempfile",
  "tokio",
 ]
 
@@ -5836,6 +5838,7 @@ dependencies = [
  "iced_core",
  "log",
  "rustc-hash 2.1.1",
+ "tokio",
  "wasm-bindgen-futures",
  "wasmtimer",
 ]

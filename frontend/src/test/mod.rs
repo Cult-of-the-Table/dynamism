@@ -1,4 +1,6 @@
-use crate::model::Point;
+use dynamism::umap::Coords;
+use dynamism::umap::FittedChunks;
+use std::sync::Arc;
 
 const CONTENTS: &[&str] = &[
     "The quick brown fox jumps over the lazy dog. This sample text demonstrates basic embedding visualization for document retrieval systems.",
@@ -34,24 +36,24 @@ const CONTENTS: &[&str] = &[
 ];
 
 const X_VALUES: &[f64] = &[
-    -3.2, 1.4, 2.8, -0.5, 4.1, -1.9, 3.6, 0.7, -2.3, 5.0,
-    -4.5, 1.1, -0.8, 3.3, 2.0, -1.2, 4.7, -3.8, 0.3, -2.7,
-    1.8, -0.1, 3.9, -1.6, 2.5, -3.0, 0.9, 4.4, -2.1, 1.6,
+    -3.2, 1.4, 2.8, -0.5, 4.1, -1.9, 3.6, 0.7, -2.3, 5.0, -4.5, 1.1, -0.8, 3.3, 2.0, -1.2, 4.7,
+    -3.8, 0.3, -2.7, 1.8, -0.1, 3.9, -1.6, 2.5, -3.0, 0.9, 4.4, -2.1, 1.6,
 ];
 
 const Y_VALUES: &[f64] = &[
-    2.1, -1.5, 3.7, 0.4, -2.8, 1.9, -0.6, 4.2, -3.1, 2.4,
-    0.8, -4.0, 3.2, -1.7, 1.3, 2.9, -0.3, -2.5, 4.6, -3.4,
-    0.1, 1.7, -4.3, 2.6, -0.9, 3.8, -1.1, 4.0, -2.0, 3.5,
+    2.1, -1.5, 3.7, 0.4, -2.8, 1.9, -0.6, 4.2, -3.1, 2.4, 0.8, -4.0, 3.2, -1.7, 1.3, 2.9, -0.3,
+    -2.5, 4.6, -3.4, 0.1, 1.7, -4.3, 2.6, -0.9, 3.8, -1.1, 4.0, -2.0, 3.5,
 ];
 
-pub fn generate_demo_data() -> Vec<Point> {
+pub fn generate_demo_data() -> Vec<FittedChunks> {
     (0..30)
-        .map(|i| Point {
-            title: format!("doc-{:03}", i + 1),
-            x: X_VALUES[i],
-            y: Y_VALUES[i],
-            content: CONTENTS[i].to_string(),
+        .map(|i| FittedChunks {
+            url: Arc::new(CONTENTS[i].to_string().into()),
+            text: Arc::new(CONTENTS[i].to_string().into()),
+            embeds: Coords {
+                x: X_VALUES[i],
+                y: Y_VALUES[i],
+            },
         })
         .collect()
 }
