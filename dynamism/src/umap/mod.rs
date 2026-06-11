@@ -10,12 +10,27 @@ use tokio::sync::mpsc::Receiver;
 pub struct FittedChunks {
     pub url: Arc<String>,
     pub text: Arc<String>,
-    pub embeds: Vec<f64>,
+    pub embeds: Coords,
+}
+#[derive(Copy, Clone, Debug, Default)]
+pub struct Coords {
+    x: f64,
+    y: f64,
+}
+impl From<Coords> for [f64; 2] {
+    fn from(c: Coords) -> Self {
+        [c.x, c.y]
+    }
+}
+impl From<[f64; 2]> for Coords {
+    fn from(v: [f64; 2]) -> Self {
+        Self { x: v[0], y: v[1] }
+    }
 }
 use anyhow::Result;
 pub async fn umap(mut _rx: Receiver<Result<EmbeddingResponse>>) -> Result<Vec<FittedChunks>> {
     let config = UmapConfig {
-        n_components: 3,
+        n_components: 2,
         ..Default::default()
     };
     let umap = Umap::<Autodiff<CubeBackend<WgpuRuntime, f32, i32, u32>>>::new(config);
@@ -34,10 +49,18 @@ pub async fn umap(mut _rx: Receiver<Result<EmbeddingResponse>>) -> Result<Vec<Fi
         .iter()
         .zip(u.into_iter())
         .zip(t.into_iter())
-        .map(|((embeds, url), text)| FittedChunks {
-            url,
-            text,
-            embeds: embeds.to_vec(),
+        .map(|((embeds, url), text)| {
+            let mut iter = embeds.iter().map(|&s| s as f64);
+            let coords = Coords {
+                x: iter.next().unwrap_or(0.0),
+                y: iter.next().unwrap_or(0.0),
+            };
+
+            FittedChunks {
+                url,
+                text,
+                embeds: coords,
+            }
         })
         .collect::<Vec<FittedChunks>>();
 
