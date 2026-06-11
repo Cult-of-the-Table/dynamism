@@ -30,10 +30,7 @@ pub async fn work(schema: Arc<Schema>, table: &Table, chunks: Vec<FittedChunks>)
 
 pub fn spawn(chunks: Vec<FittedChunks>, dir: String, name: String) -> JoinHandle<()> {
     tokio::spawn(async move {
-        let db = lancedb::connect(("../".to_owned() + &dir).as_str())
-            .execute()
-            .await
-            .unwrap();
+        let db = lancedb::connect((&dir).as_str()).execute().await.unwrap();
         let schema = Arc::new(Schema::new(vec![
             Field::new(
                 "embedding",

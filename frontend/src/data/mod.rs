@@ -5,6 +5,7 @@ use dynamism::scraper::parse;
 use dynamism::segmentation::worker::model::EmbeddingTask;
 use dynamism::umap::umap;
 use dynamism::websearch::search;
+use std::env;
 use std::path::PathBuf;
 use tempfile::tempdir;
 use tokio::task::JoinSet;
@@ -33,10 +34,12 @@ pub async fn load(query: String) -> Result<()> {
     drop(tx);
 
     let fitted_chunks = umap(rx).await?;
-    let dir = tempdir()?;
+    //let dir = tempdir()?;
+    let mut dir: PathBuf = env::current_dir().unwrap();
+    dir.push("db/");
     let db_handle = spawn(
         fitted_chunks,
-        dir.path().to_str().unwrap().to_string(),
+        dir.as_path().to_str().unwrap().to_string(),
         "test".to_string(),
     );
     drop(tel);
