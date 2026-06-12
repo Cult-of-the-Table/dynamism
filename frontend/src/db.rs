@@ -43,22 +43,23 @@ pub async fn load(query: String) -> Result<()> {
         let u = u.to_string();
         set.spawn(async move { parse((s, u)).await });
     }
-    let mut parse = (String::new(), String::new());
+    let mut parse: Vec<(String, String)> = Vec::new();
     while let Some(res) = set.join_next().await {
-        parse = res??;
+        parse.push(res??);
     }
-    let task = EmbeddingTask {
-        source_text: parse.0,
-        url: parse.1,
-    };
+
+    let task = parse.iter().map(|s| EmbeddingTask {
+        source_text: s.0.to_string(),
+        url: s.1.to_string(),
+    });
 
     let (tel, tel_handle) = dynamism::telemetry::spawn();
-    let (tx, rx, seg_handle) = dynamism::segmentation::worker::spawn(tel.clone());
-    tx.send(task).await.unwrap();
+    let (tx, rx, seg_handle) = dynamism::segmentation::worker::spawn(tel.clone()).await;
+    for t in task {
+        tx.send(t).await.unwrap();
+    }
     drop(tx);
-
-    let fitted_chunks = umap(rx).await?;
-    //let dir = tempdir()?;
+    let fitted_chunks = umap(rx, tel.clone()).await?;
     let mut dir: PathBuf = env::current_dir().unwrap();
     dir.push("db/");
     let db_handle = spawn(
