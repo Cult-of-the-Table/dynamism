@@ -5,9 +5,12 @@ edition = "2024"
 
 [dependencies]
 anyhow = "1.0.102"
+arrow-array = "58.3.0"
 dynamism = { path = "../dynamism"}
 futures = "0.3.32"
 iced = { version = "0.14.0", features = ["tokio"] }
 iced_plot = "0.4.0"
+lancedb = "0.30.0"
+serde_arrow = { version = "0.14.1", features = ["arrow-58"] }
 tempfile = "3.27.0"
 tokio = "1.52.1"

@@ -1,6 +1,6 @@
 use crate::umap::FittedChunks;
 use arrow_array::types::Float64Type;
-use arrow_array::{FixedSizeListArray, RecordBatch, RecordBatchIterator, StringArray};
+use arrow_array::{FixedSizeListArray, RecordBatch, StringArray};
 use arrow_schema::{DataType, Field, Schema};
 use lancedb::Table;
 use std::sync::Arc;
@@ -23,9 +23,7 @@ pub async fn work(schema: Arc<Schema>, table: &Table, chunks: Vec<FittedChunks>)
     )
     .unwrap();
 
-    let batch_iter = RecordBatchIterator::new(vec![batch].into_iter().map(Ok), schema.clone());
-
-    table.add(batch_iter).execute().await.unwrap();
+    table.add(vec![batch]).execute().await.unwrap();
 }
 
 pub fn spawn(chunks: Vec<FittedChunks>, dir: String, name: String) -> JoinHandle<()> {
@@ -33,7 +31,7 @@ pub fn spawn(chunks: Vec<FittedChunks>, dir: String, name: String) -> JoinHandle
         let db = lancedb::connect((&dir).as_str()).execute().await.unwrap();
         let schema = Arc::new(Schema::new(vec![
             Field::new(
-                "embedding",
+                "embeds",
                 DataType::FixedSizeList(Arc::new(Field::new("item", DataType::Float64, true)), 2),
                 true,
             ),

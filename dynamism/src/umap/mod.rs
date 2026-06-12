@@ -6,13 +6,14 @@ use fast_umap::{self, Umap, UmapConfig};
 use std::sync::Arc;
 use tokio::sync::mpsc::Receiver;
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, serde::Deserialize, Debug, Default)]
 pub struct FittedChunks {
     pub url: Arc<String>,
     pub text: Arc<String>,
     pub embeds: Coords,
 }
-#[derive(Copy, Clone, Debug, Default)]
+#[derive(Copy, serde::Deserialize, Clone, Debug, Default)]
+#[serde(from = "[f64; 2]")]
 pub struct Coords {
     pub x: f64,
     pub y: f64,

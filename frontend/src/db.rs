@@ -3,12 +3,36 @@ use dynamism::db::worker::spawn;
 use dynamism::reqwest::download;
 use dynamism::scraper::parse;
 use dynamism::segmentation::worker::model::EmbeddingTask;
+use dynamism::umap::FittedChunks;
 use dynamism::umap::umap;
 use dynamism::websearch::search;
+use futures::StreamExt;
+use lancedb::{
+    self,
+    query::{ExecutableQuery, QueryBase},
+};
+use serde_arrow;
 use std::env;
 use std::path::PathBuf;
 use tempfile::tempdir;
 use tokio::task::JoinSet;
+pub async fn read(dir: String) -> Vec<FittedChunks> {
+    let db = lancedb::connect(&dir).execute().await.unwrap();
+    let table = db.open_table("embeds").execute().await.unwrap();
+    let mut stream = table
+        .query()
+        .select(lancedb::query::Select::All)
+        .execute()
+        .await
+        .unwrap();
+    let mut chunks = Vec::new();
+    while let Some(result) = stream.next().await {
+        let batch = result.unwrap();
+        let records: Vec<FittedChunks> = serde_arrow::from_record_batch(&batch).unwrap();
+        chunks.extend(records);
+    }
+    chunks
+}
 pub async fn load(query: String) -> Result<()> {
     let mut set = JoinSet::new();
     let results = search(query.as_str()).await?;

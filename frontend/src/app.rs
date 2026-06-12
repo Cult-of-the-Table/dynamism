@@ -1,18 +1,19 @@
-use crate::data::load;
+use crate::db::{load, read};
 use dynamism::umap::FittedChunks;
-use iced::widget::{column, row};
+use iced::Alignment;
+use iced::widget::{button, column, container, row, stack, text_input};
 use iced::{Element, Length, Task};
 use iced_plot::{
     HoverPickEvent, PlotUiMessage, PlotWidget, PlotWidgetBuilder, PointId, Series, ShapeId,
 };
 
-use crate::test::generate_demo_data;
-
 #[derive(Debug, Clone)]
 pub enum Message {
     Welcome,
+    ButtonPressed,
+    ContentChanged(String),
     Plot(PlotUiMessage),
-    DB,
+    DB(Vec<FittedChunks>),
 }
 
 pub struct Dynamism {
@@ -20,10 +21,11 @@ pub struct Dynamism {
     pub series_id: Option<ShapeId>,
     pub points: Option<Vec<FittedChunks>>,
     pub picked_index: Option<usize>,
+    pub content: String,
 }
 
 impl Dynamism {
-    pub fn new() -> (Self, Task<Message>) {
+    pub fn new() -> Self {
         let widget = PlotWidgetBuilder::new()
             .with_autoscale_on_updates(true)
             .with_hover_highlight_provider(|_ctx, point| {
@@ -39,25 +41,47 @@ impl Dynamism {
             .build()
             .unwrap();
 
-        let app = Self {
+        Self {
+            content: String::new(),
             widget,
             series_id: None,
             points: None,
             picked_index: None,
-        };
-        let load = Task::perform(load("rustlang".to_string()), |result| match result {
-            Ok(()) => Message::DB,
-            _ => Message::DB,
-        });
-        // let load = Task::perform(async {}, |_| Message::DB);
-        (app, load)
+        }
+        //let load = Task::perform(load("rustlang".to_string()), |result| match result {
+        //    Ok(()) => Message::DB,
+        //    _ => Message::DB,
+        //});
+        //let load = Task::perform(async {}, |_| Message::DB);
     }
 
     pub fn update(&mut self, message: Message) -> Task<Message> {
         match message {
+            Message::ContentChanged(content) => self.content = content,
             Message::Welcome => todo!(),
-            Message::DB => {
-                self.points = Some(generate_demo_data());
+            Message::ButtonPressed => {
+                println!("{}", self.content.to_string());
+                let query = self.content.clone();
+
+                let task = Task::perform(
+                    async move {
+                        load(query).await.unwrap();
+
+                        let mut dir = std::env::current_dir().unwrap();
+                        dir.push("db/");
+
+                        Ok(read(dir.to_str().unwrap().to_string()).await)
+                    },
+                    |result| match result {
+                        Ok(records) => Message::DB(records),
+                        Err(err) => err,
+                    },
+                );
+                self.content.clear();
+                return task;
+            }
+            Message::DB(chunks) => {
+                self.points = Some(chunks);
                 let series = Series::circles(
                     self.points
                         .as_ref()
@@ -106,7 +130,21 @@ impl Dynamism {
     }
 
     pub fn view(&self) -> Element<'_, Message> {
-        row![self.widget.view().map(Message::Plot), self.detail_panel()]
+        let graph = row![self.widget.view().map(Message::Plot), self.detail_panel()]
+            .width(Length::Fill)
+            .height(Length::Fill);
+        let input = container(row![
+            text_input("test", &self.content)
+                .on_input(Message::ContentChanged)
+                .width(200),
+            button("test").on_press(Message::ButtonPressed)
+        ])
+        .width(Length::Fill)
+        .height(Length::Fill)
+        .align_x(Alignment::Start)
+        .align_y(Alignment::End)
+        .padding(20);
+        stack![graph, input]
             .width(Length::Fill)
             .height(Length::Fill)
             .into()
