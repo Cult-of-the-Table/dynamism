@@ -3936,6 +3936,7 @@ dependencies = [
  "arrow-array",
  "arrow-schema",
  "burn",
+ "crossbeam-channel",
  "fast-umap",
  "fastembed",
  "futures",

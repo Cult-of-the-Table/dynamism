@@ -1,13 +1,12 @@
-use std::time::Duration;
-
 use anyhow::Result;
 use fastembed::{EmbeddingModel, InitOptions, TextEmbedding};
 use indicatif::{ProgressBar, ProgressDrawTarget, ProgressStyle};
+use std::time::Duration;
 use tokio::sync::mpsc::{Receiver, Sender, channel};
 use tokio::task::JoinHandle;
 
 use crate::segmentation::*;
-use crate::telemetry::TelEvent;
+use crate::telemetry::{BarEvent, TelEvent};
 use model::*;
 
 pub mod model;
@@ -16,24 +15,24 @@ pub async fn work(
     task: EmbeddingTask,
     sigma: f64,
     e_tx: Sender<Batch>,
-    tel: Sender<TelEvent>,
+    bar_tx: Sender<BarEvent>,
 ) -> Result<EmbeddingResponse> {
     //println!("work started");
     let EmbeddingTask { source_text, url } = task;
 
     Ok(EmbeddingResponse {
-        chunks: chunker(&source_text, &url, sigma, e_tx.clone(), tel.clone()).await?,
+        chunks: chunker(&source_text, &url, sigma, e_tx.clone(), bar_tx.clone()).await?,
     })
 }
 
-pub fn spawn(
+pub async fn spawn(
     tel: Sender<TelEvent>,
 ) -> (
     Sender<EmbeddingTask>,
     Receiver<Result<EmbeddingResponse>>,
     JoinHandle<()>,
 ) {
-    println!("Spawn start");
+    //    println!("Spawn start");
     let (tx, mut _rx) = channel(10);
     let (_tx, rx) = channel(10);
     let (e_tx, mut e_rx) = channel(100);
@@ -42,15 +41,26 @@ pub fn spawn(
         InitOptions::new(EmbeddingModel::NomicEmbedTextV15).with_show_download_progress(true),
     )
     .unwrap();
-    println!("model loaded");
-    let tel2 = tel.clone();
+    //   println!("model loaded");
+    let (b_tx, b_rx) = tokio::sync::oneshot::channel();
+    let _ = tel
+        .send(TelEvent::CreateBar {
+            total: 0,
+            style: ProgressStyle::default_bar(),
+            reply: b_tx,
+        })
+        .await;
+    let bar_reply = b_rx.await.unwrap();
+
+    let emb_bar_reply = bar_reply.clone();
     tokio::spawn(async move {
-        println!("embed started");
+        //      println!("embed started");
         let mut buff: Vec<Batch> = Vec::new();
         while e_rx.recv_many(&mut buff, 1).await > 0 {
             let text = buff.iter().map(|s| s.text.as_str()).collect::<Vec<&str>>();
             if let Ok(embedding) = model.embed(text, None) {
-                tel2.send(TelEvent::ProcessedData(buff.len() as u64))
+                emb_bar_reply
+                    .send(BarEvent::Inc(buff.len() as u64))
                     .await
                     .unwrap();
                 for (msg, embedding) in buff.drain(..).zip(embedding) {
@@ -60,24 +70,27 @@ pub fn spawn(
                 buff.clear()
             }
         }
+        let _ = emb_bar_reply
+            .send(BarEvent::Finish("Embedding Complete".to_string()))
+            .await;
     });
 
     let handle = tokio::spawn(async move {
-        println!("thread spawned");
+        //     println!("thread spawned");
         while let Some(msg) = _rx.recv().await {
             let _tx = _tx.clone();
             let e_tx = e_tx.clone();
+            let bar_tx = bar_reply.clone();
             let tel = tel.clone();
             tokio::spawn(async move {
-                let spinner = ProgressBar::with_draw_target(None, ProgressDrawTarget::hidden());
-                spinner.set_style(ProgressStyle::default_spinner());
-                let _ = tel.send(TelEvent::Spinner(spinner.clone())).await;
-                spinner.enable_steady_tick(Duration::from_millis(100));
-                spinner.set_message("test");
-                _tx.send(work(msg, 0.1, e_tx, tel).await).await.unwrap();
-                spinner.finish();
+                let (s_tx, s_rx) = tokio::sync::oneshot::channel();
+                let _ = tel.send(TelEvent::CreateSpinner { reply: s_tx }).await;
+                let reply = s_rx.await.unwrap();
+                _tx.send(work(msg, 0.1, e_tx, bar_tx).await).await.unwrap();
+                let _ = reply.send(BarEvent::Finish("Done".to_string())).await;
             });
         }
+        drop(e_tx);
         drop(tel);
     });
 
