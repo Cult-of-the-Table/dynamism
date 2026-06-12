@@ -7,7 +7,7 @@ use std::ops::Range;
 use std::sync::Arc;
 use uuid::Uuid;
 
-use crate::telemetry::TelEvent;
+use crate::telemetry::{BarEvent, TelEvent};
 use model::EmbeddedChunk;
 use tokio::sync::mpsc::Sender;
 use tokio::{self, sync};
@@ -40,10 +40,10 @@ pub async fn chunker(
     url: &str,
     sigma: f64,
     e_tx: Sender<Batch>,
-    tel: Sender<TelEvent>,
+    bar_tx: Sender<BarEvent>,
 ) -> Result<Vec<EmbeddedChunk>, Error> {
     let segment = segment(source).await.unwrap();
-    chunk(segment, url, source, sigma, e_tx.clone(), tel.clone()).await
+    chunk(segment, url, source, sigma, e_tx.clone(), bar_tx.clone()).await
 }
 async fn chunk(
     ranges: Vec<Range<usize>>,
@@ -51,7 +51,7 @@ async fn chunk(
     source: &str,
     sigma: f64,
     e_tx: Sender<Batch>,
-    tel: Sender<TelEvent>,
+    bar_tx: Sender<BarEvent>,
 ) -> Result<Vec<EmbeddedChunk>, Error> {
     //println!("Chunk function start");
     let source = Arc::new(source.to_string());
@@ -60,7 +60,8 @@ async fn chunk(
         .iter()
         .map(|&Range { start, end }| source[start..end].to_string())
         .collect::<Vec<String>>();
-    tel.send(TelEvent::NewData(segments.len() as u64))
+    bar_tx
+        .send(BarEvent::AddLen(segments.len() as u64))
         .await
         .unwrap();
 
