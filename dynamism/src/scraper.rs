@@ -1,19 +1,28 @@
 use anyhow::Result;
+use readability_rust::Readability;
 use scraper::Html;
 
 pub async fn parse(html: (String, String)) -> Result<(String, String)> {
-    let download = Some(html).map(|(s, u)| (Html::parse_document(s.as_str()), u));
-    let text = Some(download.unwrap()).map(|(s, u)| {
-        (
-            s.root_element()
-                .text()
-                .flat_map(|s| s.split_whitespace())
-                .collect::<Vec<_>>()
-                .join(" "),
-            u,
-        )
-    });
-    Ok(text.unwrap())
+    let (text, url) = html;
+    let shtml = Html::parse_document(text.as_str());
+    let mut parser = Readability::new_with_base_uri(&text, &url, None).unwrap();
+
+    if let Some(article) = parser.parse() {
+        let stext = article
+            .text_content
+            .unwrap()
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ");
+        return Ok((stext, url));
+    }
+    let stext = shtml
+        .root_element()
+        .text()
+        .flat_map(|s| s.split_whitespace())
+        .collect::<Vec<_>>()
+        .join(" ");
+    Ok((stext, url))
 }
 #[cfg(test)]
 pub mod tests {
