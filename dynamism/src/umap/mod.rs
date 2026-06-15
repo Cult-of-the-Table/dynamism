@@ -9,16 +9,17 @@ use indicatif::ProgressStyle;
 use std::sync::Arc;
 use tokio::sync::mpsc::{Receiver, Sender};
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, serde::Deserialize, Debug, Default)]
 pub struct FittedChunks {
     pub url: Arc<String>,
     pub text: Arc<String>,
     pub embeds: Coords,
 }
-#[derive(Copy, Clone, Debug, Default)]
+#[derive(Copy, serde::Deserialize, Clone, Debug, Default)]
+#[serde(from = "[f64; 2]")]
 pub struct Coords {
-    x: f64,
-    y: f64,
+    pub x: f64,
+    pub y: f64,
 }
 impl From<Coords> for [f64; 2] {
     fn from(c: Coords) -> Self {

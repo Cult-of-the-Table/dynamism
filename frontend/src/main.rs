@@ -1,4 +1,13 @@
-use iced::{Element, Task, Theme, widget::container};
+#![recursion_limit = "256"]
+
+pub mod app;
+pub mod db;
+pub mod model;
+pub mod test;
+
+use iced::Theme;
+
+use app::Dynamism;
 
 pub fn main() -> iced::Result {
     iced::application(Dynamism::new, Dynamism::update, Dynamism::view)
@@ -6,31 +15,4 @@ pub fn main() -> iced::Result {
         .run()?;
 
     Ok(())
-}
-#[derive(Debug, Clone)]
-enum Message {
-    Welcome,
-}
-#[derive(Debug, Clone)]
-pub struct PointData {
-    pub x: f64,
-    pub y: f64,
-    pub url: String,
-    pub text: String,
-}
-
-struct Dynamism {}
-
-impl Dynamism {
-    fn new() -> Self {
-        Self {}
-    }
-
-    fn update(&mut self, _message: Message) -> Task<Message> {
-        Task::none()
-    }
-
-    fn view(&self) -> Element<'_, Message> {
-        container("test").style(container::rounded_box).into()
-    }
 }
