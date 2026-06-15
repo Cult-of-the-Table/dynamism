@@ -15,11 +15,17 @@ pub async fn work(schema: Arc<Schema>, table: &Table, chunks: Vec<FittedChunks>)
         2,
     );
     let urls = StringArray::from_iter_values(chunks.iter().map(|s| s.url.to_string()));
+    let snippet = StringArray::from_iter_values(chunks.iter().map(|s| s.snippet.to_string()));
     let text = StringArray::from_iter_values(chunks.iter().map(|s| s.text.to_string()));
 
     let batch = RecordBatch::try_new(
         schema.clone(),
-        vec![Arc::new(embeds), Arc::new(urls), Arc::new(text)],
+        vec![
+            Arc::new(embeds),
+            Arc::new(urls),
+            Arc::new(snippet),
+            Arc::new(text),
+        ],
     )
     .unwrap();
 
@@ -36,6 +42,7 @@ pub fn spawn(chunks: Vec<FittedChunks>, dir: String, name: String) -> JoinHandle
                 true,
             ),
             Field::new("url", DataType::Utf8, false),
+            Field::new("snippet", DataType::Utf8, false),
             Field::new("text", DataType::Utf8, false),
         ]));
         let table = db

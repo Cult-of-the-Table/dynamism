@@ -10,7 +10,7 @@ use websearch::{
 pub async fn search(query: &str) -> Result<Vec<SearchResult>, SearchError> {
     let strategy = MultiProviderStrategy::Aggregate;
     let schema = MultiProviderConfig::new(strategy);
-    let schema = schema.add_provider(Box::new(ArxivProvider::new()));
+    //let schema = schema.add_provider(Box::new(ArxivProvider::new()));
     let schema = schema.add_provider(Box::new(DuckDuckGoProvider::new()));
     let mut multi = MultiProviderSearch::new(schema);
     let search = SearchOptionsMulti {

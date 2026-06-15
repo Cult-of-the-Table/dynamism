@@ -1,11 +1,15 @@
 use anyhow::Result;
 use readability_rust::Readability;
+use sanitize_html::rules::predefined::DEFAULT;
+use sanitize_html::sanitize_str;
 use scraper::Html;
 
 pub async fn parse(html: (String, String)) -> Result<(String, String)> {
     let (text, url) = html;
-    let shtml = Html::parse_document(text.as_str());
-    let mut parser = Readability::new_with_base_uri(&text, &url, None).unwrap();
+
+    let sanitize_default: String = sanitize_str(&DEFAULT, &text).unwrap();
+    let shtml = Html::parse_document(&sanitize_default.as_str());
+    let mut parser = Readability::new_with_base_uri(&sanitize_default, &url, None).unwrap();
 
     if let Some(article) = parser.parse() {
         let stext = article
@@ -24,6 +28,7 @@ pub async fn parse(html: (String, String)) -> Result<(String, String)> {
         .join(" ");
     Ok((stext, url))
 }
+
 #[cfg(test)]
 pub mod tests {
     use super::*;

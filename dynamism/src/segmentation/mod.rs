@@ -113,11 +113,14 @@ async fn chunk(
 }
 async fn segment(s: &str) -> Result<Vec<Range<usize>>, Error> {
     let segmenter = SentenceSegmenter::new(SentenceBreakInvariantOptions::default());
-    let segments = segmenter
+    let mut segments = segmenter
         .segment_str(s)
         .tuple_windows()
         .map(|(i, j)| i..j)
-        .collect();
+        .collect::<Vec<Range<usize>>>();
+    if segments.len() > 700 {
+        segments.truncate(700);
+    }
     Ok(segments)
 }
 

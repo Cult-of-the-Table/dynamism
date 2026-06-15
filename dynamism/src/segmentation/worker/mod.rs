@@ -1,4 +1,6 @@
 use anyhow::Result;
+use candle_core::{DType, Device};
+use fastembed::NomicV2MoeTextEmbedding;
 use fastembed::{EmbeddingModel, InitOptions, TextEmbedding};
 use indicatif::{ProgressBar, ProgressDrawTarget, ProgressStyle};
 use std::time::Duration;
@@ -37,6 +39,14 @@ pub async fn spawn(
     let (_tx, rx) = channel(10);
     let (e_tx, mut e_rx) = channel(100);
 
+    //let device = Device::Cpu;
+    //let model = NomicV2MoeTextEmbedding::from_hf(
+    //    "nomic-ai/nomic-embed-text-v2-moe",
+    //    &device,
+    //    DType::F32,
+    //    768,
+    //)
+    //.unwrap();
     let mut model = TextEmbedding::try_new(
         InitOptions::new(EmbeddingModel::NomicEmbedTextV15).with_show_download_progress(true),
     )
@@ -57,7 +67,11 @@ pub async fn spawn(
         //      println!("embed started");
         let mut buff: Vec<Batch> = Vec::new();
         while e_rx.recv_many(&mut buff, 1).await > 0 {
-            let text = buff.iter().map(|s| s.text.as_str()).collect::<Vec<&str>>();
+            let text = buff
+                .iter()
+                .map(|s| format!("search_document: {}", s.text))
+                .collect::<Vec<String>>();
+            let text = text.iter().map(|s| s.as_str()).collect::<Vec<&str>>();
             if let Ok(embedding) = model.embed(text, None) {
                 emb_bar_reply
                     .send(BarEvent::Inc(buff.len() as u64))

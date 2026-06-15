@@ -131,6 +131,8 @@ impl Dynamism {
                         .size(12)
                         .color(iced::Color::from_rgb(0.5, 0.5, 0.5)),
                     text(&**chunk.url).size(14),
+                    text("Snippet").size(12),
+                    text(&**chunk.snippet).size(14),
                     text("Text:")
                         .size(12)
                         .color(iced::Color::from_rgb(0.5, 0.5, 0.5)),
