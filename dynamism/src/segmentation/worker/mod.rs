@@ -39,19 +39,21 @@ pub async fn spawn(
     let (_tx, rx) = channel(10);
     let (e_tx, mut e_rx) = channel(100);
 
-    //let device = Device::Cpu;
-    //let model = NomicV2MoeTextEmbedding::from_hf(
-    //    "nomic-ai/nomic-embed-text-v2-moe",
-    //    &device,
-    //    DType::F32,
-    //    768,
-    //)
-    //.unwrap();
+    // nomic model 2 test
+    {
+        //let device = Device::Cpu;
+        //let model = NomicV2MoeTextEmbedding::from_hf(
+        //    "nomic-ai/nomic-embed-text-v2-moe",
+        //    &device,
+        //    DType::F32,
+        //    768,
+        //)
+        //.unwrap();
+    }
     let mut model = TextEmbedding::try_new(
         InitOptions::new(EmbeddingModel::NomicEmbedTextV15).with_show_download_progress(true),
     )
     .unwrap();
-    //   println!("model loaded");
     let (b_tx, b_rx) = tokio::sync::oneshot::channel();
     let _ = tel
         .send(TelEvent::CreateBar {
@@ -61,12 +63,13 @@ pub async fn spawn(
         })
         .await;
     let bar_reply = b_rx.await.unwrap();
-
     let emb_bar_reply = bar_reply.clone();
+
+    // receives data from `super::chunker()` and passes it into the embedding model
     tokio::spawn(async move {
-        //      println!("embed started");
         let mut buff: Vec<Batch> = Vec::new();
         while e_rx.recv_many(&mut buff, 1).await > 0 {
+            // rec from segmentation::chunk()
             let text = buff
                 .iter()
                 .map(|s| format!("search_document: {}", s.text))
@@ -78,7 +81,7 @@ pub async fn spawn(
                     .await
                     .unwrap();
                 for (msg, embedding) in buff.drain(..).zip(embedding) {
-                    let _ = msg.reply.send(embedding);
+                    let _ = msg.reply.send(embedding); // sent to segmentation::chunk()
                 }
             } else {
                 buff.clear()
@@ -89,18 +92,23 @@ pub async fn spawn(
             .await;
     });
 
+    // populates the eventually returned rx channel with the result of `work()`
     let handle = tokio::spawn(async move {
-        //     println!("thread spawned");
         while let Some(msg) = _rx.recv().await {
+            // rec from db::load()
+
             let _tx = _tx.clone();
             let e_tx = e_tx.clone();
+
+            // telemetry items:
             let bar_tx = bar_reply.clone();
             let tel = tel.clone();
+
             tokio::spawn(async move {
                 let (s_tx, s_rx) = tokio::sync::oneshot::channel();
                 let _ = tel.send(TelEvent::CreateSpinner { reply: s_tx }).await;
                 let reply = s_rx.await.unwrap();
-                _tx.send(work(msg, 0.1, e_tx, bar_tx).await).await.unwrap();
+                _tx.send(work(msg, 0.1, e_tx, bar_tx).await).await.unwrap(); // sent to umap::umap()
                 let _ = reply.send(BarEvent::Finish("Done".to_string())).await;
             });
         }

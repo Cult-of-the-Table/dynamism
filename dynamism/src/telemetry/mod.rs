@@ -22,6 +22,8 @@ pub enum TelEvent {
         reply: tokio::sync::oneshot::Sender<tokio::sync::mpsc::Sender<BarEvent>>,
     },
 }
+// pretty self explainatory, match on TelEvent,
+// then match on BarEvent and update accordingly
 pub fn spawn() -> (Sender<TelEvent>, JoinHandle<()>) {
     let multi = MultiProgress::new();
     let (tx, mut rx) = channel(10);

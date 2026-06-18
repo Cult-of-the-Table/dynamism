@@ -7,6 +7,7 @@ use std::sync::Arc;
 use tokio::task::JoinHandle;
 
 pub async fn work(schema: Arc<Schema>, table: &Table, chunks: Vec<FittedChunks>) {
+    //flatten chunks for fixedsizelistarray ingestion
     let embeds = FixedSizeListArray::from_iter_primitive::<Float64Type, _, _>(
         chunks.iter().map(|s| {
             let v: [f64; 2] = s.embeds.into();
@@ -29,10 +30,12 @@ pub async fn work(schema: Arc<Schema>, table: &Table, chunks: Vec<FittedChunks>)
     )
     .unwrap();
 
+    // push to db
     table.add(vec![batch]).execute().await.unwrap();
 }
 
 pub fn spawn(chunks: Vec<FittedChunks>, dir: String, name: String) -> JoinHandle<()> {
+    // connect, schema, create table, load data
     tokio::spawn(async move {
         let db = lancedb::connect((&dir).as_str()).execute().await.unwrap();
         let schema = Arc::new(Schema::new(vec![

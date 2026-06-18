@@ -38,6 +38,7 @@ pub async fn umap(
     mut _rx: Receiver<Result<EmbeddingResponse>>,
     tel: Sender<TelEvent>,
 ) -> Result<Vec<FittedChunks>> {
+    // config
     let config = UmapConfig {
         n_components: 2,
         graph: GraphParams {
@@ -53,6 +54,7 @@ pub async fn umap(
     };
     let umap = Umap::<Autodiff<CubeBackend<WgpuRuntime, f32, i32, u32>>>::new(config.clone());
 
+    // rec from worker::spawn()
     let (mut u, mut t, mut ct, mut c) = (Vec::new(), Vec::new(), Vec::new(), Vec::new());
     while let Some(Ok(EmbeddingResponse { chunks })) = _rx.recv().await {
         chunks.into_iter().for_each(|s| {
@@ -62,6 +64,8 @@ pub async fn umap(
             c.push(s.embedding);
         })
     }
+
+    // telemetry
     let (b_tx, b_rx) = tokio::sync::oneshot::channel();
     tel.send(TelEvent::CreateBar {
         total: config.optimization.n_epochs as u64,
@@ -71,11 +75,11 @@ pub async fn umap(
     .await?;
     let reply = b_rx.await?;
     let reply_prog = reply.clone();
-
     let progress = Box::new(move |progress: fast_umap::EpochProgress| {
         let _ = reply_prog.try_send(BarEvent::SetPos(progress.epoch as u64));
     });
 
+    // chunks sent to umap
     let (_exit_tx, exit_rx) = crossbeam_channel::bounded(1);
     let fitted =
         tokio::task::spawn_blocking(move || umap.fit_with_progress(c, None, exit_rx, progress))
@@ -84,6 +88,9 @@ pub async fn umap(
     let _ = reply
         .send(BarEvent::Finish("Umap Complete".to_string()))
         .await;
+
+    // output of umap
+    // zipped and collected into FittedChunks
     let new_embeds = fitted.embedding();
     let fitted_chunks = new_embeds
         .iter()
