@@ -53,7 +53,6 @@ async fn chunk(
     e_tx: Sender<Batch>,
     bar_tx: Sender<BarEvent>,
 ) -> Result<Vec<EmbeddedChunk>, Error> {
-    //println!("Chunk function start");
     let source = Arc::new(source.to_string());
     let url = Arc::new(url.to_string());
     let segments = ranges
@@ -67,16 +66,17 @@ async fn chunk(
 
     let mut receivers = Vec::with_capacity(segments.len());
 
+    // packages the segments with a receiveer and passes them to the embedding model
     for seg in segments {
         let (r_tx, r_rx) = tokio::sync::oneshot::channel();
         let msg = Batch {
             text: seg,
             reply: r_tx,
         };
-        e_tx.send(msg).await?;
+        e_tx.send(msg).await?; // sent to worker::spawn()
         receivers.push(r_rx);
     }
-    let embeds = try_join_all(receivers).await.unwrap();
+    let embeds = try_join_all(receivers).await.unwrap(); // rec from worker::spawn()
 
     let embedded_chunks = ranges
         .into_iter()
@@ -94,18 +94,21 @@ async fn chunk(
         return Ok(vec![]);
     }
 
-    let mut merged: Vec<EmbeddedChunk> = vec![embedded_chunks[0].clone()];
+    {
+        let mut merged: Vec<EmbeddedChunk> = vec![embedded_chunks[0].clone()];
 
-    for window in embedded_chunks.windows(2) {
-        let prev = &window[0];
-        let curr = &window[1];
-        let sim = cosine_similarity(&prev.embedding, &curr.embedding);
+        // rolls a window over chunk pairs and merges them if their embedding is similar
+        for window in embedded_chunks.windows(2) {
+            let prev = &window[0];
+            let curr = &window[1];
+            let sim = cosine_similarity(&prev.embedding, &curr.embedding);
 
-        if sim > 1.0 - sigma {
-            let last = merged.last_mut().unwrap();
-            last.range = last.range.start..curr.range.end;
-        } else {
-            merged.push(curr.clone());
+            if sim > 1.0 - sigma {
+                let last = merged.last_mut().unwrap();
+                last.range = last.range.start..curr.range.end;
+            } else {
+                merged.push(curr.clone());
+            }
         }
     }
 
