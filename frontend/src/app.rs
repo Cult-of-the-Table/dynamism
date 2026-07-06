@@ -25,6 +25,11 @@ pub struct Dynamism {
     pub content: String,
 }
 
+impl Default for Dynamism {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 impl Dynamism {
     pub fn new() -> Self {
         let widget = PlotWidgetBuilder::new()
@@ -61,7 +66,7 @@ impl Dynamism {
             Message::ContentChanged(content) => self.content = content,
             Message::Welcome => todo!(),
             Message::ButtonPressed => {
-                println!("{}", self.content.to_string());
+                println!("{}", self.content);
                 let query = self.content.clone();
 
                 let task = Task::perform(

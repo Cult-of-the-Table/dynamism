@@ -7,7 +7,7 @@ use std::ops::Range;
 use std::sync::Arc;
 use uuid::Uuid;
 
-use crate::telemetry::{BarEvent, TelEvent};
+use crate::telemetry::BarEvent;
 use model::EmbeddedChunk;
 use tokio::sync::mpsc::Sender;
 use tokio::{self, sync};
@@ -110,9 +110,8 @@ async fn chunk(
                 merged.push(curr.clone());
             }
         }
+        Ok(merged)
     }
-
-    Ok(merged)
 }
 async fn segment(s: &str) -> Result<Vec<Range<usize>>, Error> {
     let segmenter = SentenceSegmenter::new(SentenceBreakInvariantOptions::default());

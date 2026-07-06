@@ -8,7 +8,7 @@ pub async fn parse(html: (String, String)) -> Result<(String, String)> {
     let (text, url) = html;
 
     let sanitize_default: String = sanitize_str(&DEFAULT, &text).unwrap();
-    let shtml = Html::parse_document(&sanitize_default.as_str());
+    let shtml = Html::parse_document(sanitize_default.as_str());
     let mut parser = Readability::new_with_base_uri(&sanitize_default, &url, None).unwrap();
 
     if let Some(article) = parser.parse() {
