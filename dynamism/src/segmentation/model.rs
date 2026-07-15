@@ -7,6 +7,15 @@ use uuid::Uuid;
 
 use fastembed::Embedding;
 
+pub struct EmbeddingTask {
+    pub source_text: String,
+    pub url: String,
+}
+
+pub struct EmbeddingResponse {
+    pub chunks: Vec<EmbeddedChunk>,
+}
+
 #[derive(Clone, Debug, Default)]
 pub struct EmbeddedChunk {
     pub id: Uuid,

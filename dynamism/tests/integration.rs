@@ -2,17 +2,12 @@ use anyhow::Result;
 use dynamism::db::worker::spawn;
 use dynamism::reqwest::download;
 use dynamism::scraper::parse;
-use dynamism::segmentation::worker::model::EmbeddingResponse;
-use dynamism::segmentation::worker::model::EmbeddingTask;
-use dynamism::telemetry::{BarEvent, TelEvent};
+use dynamism::segmentation::model::{EmbeddingResponse, EmbeddingTask};
+use dynamism::telemetry::TelEvent;
 use dynamism::umap::umap;
 use dynamism::websearch::search;
-use indicatif::{
-    //ProgressBar, ProgressDrawTarget,
-    ProgressStyle,
-};
-use lancedb::embeddings::EmbeddingRegistry;
-use tokio::sync::mpsc::{Receiver, Sender, channel};
+use indicatif::ProgressStyle;
+use tokio::sync::mpsc::channel;
 use tokio::task::JoinSet;
 #[tokio::test(flavor = "multi_thread")]
 async fn init_pipe() -> Result<()> {
@@ -39,7 +34,7 @@ async fn init_pipe() -> Result<()> {
 
     let (tel, tel_handle) = dynamism::telemetry::spawn();
     let (batch_tx, batch_rx) = channel(100);
-    let embed_handle = dynamism::segmentation::worker::embed_loop(batch_rx, tel.clone()).await;
+    let embed_handle = dynamism::segmentation::embed_loop(batch_rx, tel.clone()).await;
     let (b_tx, b_rx) = tokio::sync::oneshot::channel();
     let _ = tel
         .send(TelEvent::CreateBar {
@@ -56,7 +51,7 @@ async fn init_pipe() -> Result<()> {
         let bar_tx = bar_reply.clone();
         tokio::spawn(async move {
             let EmbeddingTask { source_text, url } = t;
-            let chunks = dynamism::segmentation::chunk(&source_text, &url, batch_tx, bar_tx)
+            let chunks = dynamism::segmentation::segment_pipe_start(&source_text, &url, batch_tx)
                 .await
                 .unwrap();
             tx.send(Ok(EmbeddingResponse { chunks })).await.unwrap();

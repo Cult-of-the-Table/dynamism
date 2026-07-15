@@ -8,6 +8,7 @@ use uuid::Uuid;
 
 use crate::Pipeline;
 use crate::segmentation::model::EmbeddedChunk;
+
 pub fn cosine_similarity(a: &Embedding, b: &Embedding) -> f64 {
     let a: &[f32] = a;
     let b: &[f32] = b;
@@ -49,22 +50,6 @@ impl Pipeline<&str> {
             Ok((segments, ranges))
         })
     }
-}
-pub fn segment(s: &str) -> Result<(Vec<String>, Vec<Range<usize>>), Error> {
-    let segmenter = SentenceSegmenter::new(SentenceBreakInvariantOptions::default());
-    let mut ranges = segmenter
-        .segment_str(s)
-        .tuple_windows()
-        .map(|(i, j)| i..j)
-        .collect::<Vec<Range<usize>>>();
-    if ranges.len() > 700 {
-        ranges.truncate(700);
-    }
-    let segments = ranges
-        .iter()
-        .map(|&Range { start, end }| s[start..end].to_string())
-        .collect::<Vec<String>>();
-    Ok((segments, ranges))
 }
 
 impl Pipeline<AssemblyInput> {

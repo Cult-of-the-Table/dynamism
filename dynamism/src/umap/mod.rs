@@ -1,4 +1,4 @@
-use crate::segmentation::worker::model::EmbeddingResponse;
+use crate::segmentation::model::EmbeddingResponse;
 use crate::telemetry::{BarEvent, TelEvent};
 use burn::backend::Autodiff;
 use burn::backend::wgpu::CubeBackend;

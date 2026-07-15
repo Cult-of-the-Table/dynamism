@@ -1,21 +1,24 @@
 use anyhow::Error;
 use fastembed::Embedding;
+use fastembed::{EmbeddingModel, InitOptions, TextEmbedding};
 use futures::future::try_join_all;
 use model::EmbeddedChunk;
 use pure::*;
 use std::sync::Arc;
-use tokio::sync::mpsc::Sender;
+use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::task::JoinHandle;
 use tokio::{self, sync};
 
+use crate::telemetry::TelEvent;
 pub mod model;
 pub mod pure;
-pub mod worker;
+//pub mod worker;
 
 pub struct Batch {
     text: String,
     reply: sync::oneshot::Sender<Embedding>,
 }
-pub async fn chunk(
+pub async fn segment_pipe_start(
     source: &str,
     url: &str,
     e_tx: Sender<Batch>,
@@ -32,10 +35,10 @@ pub async fn chunk(
             text: seg,
             reply: r_tx,
         };
-        e_tx.send(msg).await?; // sent to worker::spawn()
+        e_tx.send(msg).await?;
         receivers.push(r_rx);
     }
-    let embeds = try_join_all(receivers).await.unwrap(); // rec from worker::spawn()
+    let embeds = try_join_all(receivers).await.unwrap();
     let pipeline = crate::Pipeline::inject(AssemblyInput {
         embeds,
         ranges,
@@ -45,6 +48,29 @@ pub async fn chunk(
     .assemble_chunks()
     .merge_chunks(0.1);
     Ok(pipeline.value)
+}
+pub async fn embed_loop(mut rx: Receiver<Batch>, tel: Sender<TelEvent>) -> JoinHandle<()> {
+    let mut model = TextEmbedding::try_new(
+        InitOptions::new(EmbeddingModel::NomicEmbedTextV15).with_show_download_progress(true),
+    )
+    .unwrap();
+    tokio::spawn(async move {
+        let mut buff: Vec<Batch> = Vec::new();
+        while rx.recv_many(&mut buff, 1).await > 0 {
+            let text = buff
+                .iter()
+                .map(|s| format!("search_document: {}", s.text))
+                .collect::<Vec<_>>();
+            let text = text.iter().map(|s| s.as_str()).collect::<Vec<_>>();
+            if let Ok(embedding) = model.embed(text, None) {
+                for (msg, emb) in buff.drain(..).zip(embedding) {
+                    let _ = msg.reply.send(emb);
+                }
+            } else {
+                buff.clear()
+            }
+        }
+    })
 }
 
 #[cfg(test)]

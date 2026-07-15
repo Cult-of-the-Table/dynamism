@@ -2,7 +2,7 @@ use anyhow::Result;
 use dynamism::db::worker::spawn;
 use dynamism::reqwest::download;
 use dynamism::scraper::parse;
-use dynamism::segmentation::worker::model::EmbeddingTask;
+use dynamism::segmentation::model::EmbeddingTask;
 use dynamism::umap::FittedChunks;
 use dynamism::umap::umap;
 use dynamism::websearch::search;
