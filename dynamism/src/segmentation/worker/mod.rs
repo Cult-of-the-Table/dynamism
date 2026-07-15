@@ -1,35 +1,38 @@
 use anyhow::Result;
-//use candle_core::{DType, Device};
-//use fastembed::NomicV2MoeTextEmbedding;
 use fastembed::{EmbeddingModel, InitOptions, TextEmbedding};
-use indicatif::{
-    //ProgressBar, ProgressDrawTarget,
-    ProgressStyle,
-};
-//use std::time::Duration;
+use indicatif::ProgressStyle;
 use tokio::sync::mpsc::{Receiver, Sender, channel};
 use tokio::task::JoinHandle;
 
 use crate::segmentation::*;
 use crate::telemetry::{BarEvent, TelEvent};
 use model::*;
-
 pub mod model;
 
-pub async fn work(
-    task: EmbeddingTask,
-    sigma: f64,
-    e_tx: Sender<Batch>,
-    bar_tx: Sender<BarEvent>,
-) -> Result<EmbeddingResponse> {
-    //println!("work started");
-    let EmbeddingTask { source_text, url } = task;
-
-    Ok(EmbeddingResponse {
-        chunks: chunker(&source_text, &url, sigma, e_tx.clone(), bar_tx.clone()).await?,
+pub async fn embed_loop(mut rx: Receiver<Batch>, tel: Sender<TelEvent>) -> JoinHandle<()> {
+    let mut model = TextEmbedding::try_new(
+        InitOptions::new(EmbeddingModel::NomicEmbedTextV15).with_show_download_progress(true),
+    )
+    .unwrap();
+    tokio::spawn(async move {
+        let mut buff: Vec<Batch> = Vec::new();
+        while rx.recv_many(&mut buff, 1).await > 0 {
+            let text = buff
+                .iter()
+                .map(|s| format!("search_document: {}", s.text))
+                .collect::<Vec<_>>();
+            let text = text.iter().map(|s| s.as_str()).collect::<Vec<_>>();
+            if let Ok(embedding) = model.embed(text, None) {
+                for (msg, emb) in buff.drain(..).zip(embedding) {
+                    let _ = msg.reply.send(emb); // sent to segmentation::chunk()
+                }
+            } else {
+                buff.clear()
+            }
+        }
     })
 }
-
+#[deprecated]
 pub async fn spawn(
     tel: Sender<TelEvent>,
 ) -> (
@@ -42,17 +45,6 @@ pub async fn spawn(
     let (_tx, rx) = channel(10);
     let (e_tx, mut e_rx) = channel(100);
 
-    // nomic model 2 test
-    {
-        //let device = Device::Cpu;
-        //let model = NomicV2MoeTextEmbedding::from_hf(
-        //    "nomic-ai/nomic-embed-text-v2-moe",
-        //    &device,
-        //    DType::F32,
-        //    768,
-        //)
-        //.unwrap();
-    }
     let mut model = TextEmbedding::try_new(
         InitOptions::new(EmbeddingModel::NomicEmbedTextV15).with_show_download_progress(true),
     )
@@ -111,7 +103,20 @@ pub async fn spawn(
                 let (s_tx, s_rx) = tokio::sync::oneshot::channel();
                 let _ = tel.send(TelEvent::CreateSpinner { reply: s_tx }).await;
                 let reply = s_rx.await.unwrap();
-                _tx.send(work(msg, 0.1, e_tx, bar_tx).await).await.unwrap(); // sent to umap::umap()
+                let EmbeddingTask { source_text, url } = msg;
+                let response = EmbeddingResponse {
+                    chunks: chunk(
+                        segment(&source_text).await.unwrap(),
+                        &url,
+                        &source_text,
+                        0.1,
+                        e_tx.clone(),
+                        bar_tx.clone(),
+                    )
+                    .await
+                    .unwrap(),
+                };
+                _tx.send(Ok(response)).await.unwrap(); // sent to umap::umap()
                 let _ = reply.send(BarEvent::Finish("Done".to_string())).await;
             });
         }

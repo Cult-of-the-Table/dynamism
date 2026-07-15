@@ -1,4 +1,4 @@
-use crate::segmentation::EmbeddedChunk;
+use crate::segmentation::*;
 
 pub struct EmbeddingTask {
     pub source_text: String,

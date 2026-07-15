@@ -1,71 +1,30 @@
 use anyhow::Error;
 use fastembed::Embedding;
 use futures::future::try_join_all;
-use icu_segmenter::{SentenceSegmenter, options::SentenceBreakInvariantOptions};
-use itertools::Itertools;
-use std::ops::Range;
-use std::sync::Arc;
-use uuid::Uuid;
-
-use crate::telemetry::BarEvent;
 use model::EmbeddedChunk;
+use pure::*;
+use std::sync::Arc;
 use tokio::sync::mpsc::Sender;
 use tokio::{self, sync};
 
 pub mod model;
+pub mod pure;
 pub mod worker;
-
-fn cosine_similarity(a: &Embedding, b: &Embedding) -> f64 {
-    let a: &[f32] = a;
-    let b: &[f32] = b;
-    let dot: f64 = a
-        .iter()
-        .zip(b.iter())
-        .map(|(x, y)| (*x as f64) * (*y as f64))
-        .sum();
-    let mag_a: f64 = a.iter().map(|x| (*x as f64).powi(2)).sum::<f64>().sqrt();
-    let mag_b: f64 = b.iter().map(|x| (*x as f64).powi(2)).sum::<f64>().sqrt();
-    if mag_a == 0.0 || mag_b == 0.0 {
-        return 0.0;
-    }
-    dot / (mag_a * mag_b)
-}
 
 pub struct Batch {
     text: String,
     reply: sync::oneshot::Sender<Embedding>,
 }
-pub async fn chunker(
+pub async fn chunk(
     source: &str,
     url: &str,
-    sigma: f64,
     e_tx: Sender<Batch>,
-    bar_tx: Sender<BarEvent>,
 ) -> Result<Vec<EmbeddedChunk>, Error> {
-    let segment = segment(source).await.unwrap();
-    chunk(segment, url, source, sigma, e_tx.clone(), bar_tx.clone()).await
-}
-async fn chunk(
-    ranges: Vec<Range<usize>>,
-    url: &str,
-    source: &str,
-    sigma: f64,
-    e_tx: Sender<Batch>,
-    bar_tx: Sender<BarEvent>,
-) -> Result<Vec<EmbeddedChunk>, Error> {
+    let pipeline = crate::Pipeline::inject(source);
+    let (segments, ranges) = pipeline.segment().value?;
     let source = Arc::new(source.to_string());
     let url = Arc::new(url.to_string());
-    let segments = ranges
-        .iter()
-        .map(|&Range { start, end }| source[start..end].to_string())
-        .collect::<Vec<String>>();
-    bar_tx
-        .send(BarEvent::AddLen(segments.len() as u64))
-        .await
-        .unwrap();
-
     let mut receivers = Vec::with_capacity(segments.len());
-
     // packages the segments with a receiveer and passes them to the embedding model
     for seg in segments {
         let (r_tx, r_rx) = tokio::sync::oneshot::channel();
@@ -77,53 +36,15 @@ async fn chunk(
         receivers.push(r_rx);
     }
     let embeds = try_join_all(receivers).await.unwrap(); // rec from worker::spawn()
-
-    let embedded_chunks = ranges
-        .into_iter()
-        .zip(embeds)
-        .map(|(range, embedding)| EmbeddedChunk {
-            id: Uuid::new_v4(),
-            source_url: url.clone(),
-            source_text: source.clone(),
-            range,
-            embedding,
-        })
-        .collect::<Vec<EmbeddedChunk>>();
-
-    if embedded_chunks.is_empty() {
-        return Ok(vec![]);
-    }
-
-    {
-        let mut merged: Vec<EmbeddedChunk> = vec![embedded_chunks[0].clone()];
-
-        // rolls a window over chunk pairs and merges them if their embedding is similar
-        for window in embedded_chunks.windows(2) {
-            let prev = &window[0];
-            let curr = &window[1];
-            let sim = cosine_similarity(&prev.embedding, &curr.embedding);
-
-            if sim > 1.0 - sigma {
-                let last = merged.last_mut().unwrap();
-                last.range = last.range.start..curr.range.end;
-            } else {
-                merged.push(curr.clone());
-            }
-        }
-        Ok(merged)
-    }
-}
-async fn segment(s: &str) -> Result<Vec<Range<usize>>, Error> {
-    let segmenter = SentenceSegmenter::new(SentenceBreakInvariantOptions::default());
-    let mut segments = segmenter
-        .segment_str(s)
-        .tuple_windows()
-        .map(|(i, j)| i..j)
-        .collect::<Vec<Range<usize>>>();
-    if segments.len() > 700 {
-        segments.truncate(700);
-    }
-    Ok(segments)
+    let pipeline = crate::Pipeline::inject(AssemblyInput {
+        embeds,
+        ranges,
+        source,
+        url,
+    })
+    .assemble_chunks()
+    .merge_chunks(0.1);
+    Ok(pipeline.value)
 }
 
 #[cfg(test)]
@@ -132,7 +53,7 @@ pub mod tests {
     #[tokio::test]
     async fn seg_test() {
         let text = "Hello world. This is Rust.";
-        let sentences = segment(text).await.unwrap();
+        let sentences = segment(text).unwrap();
         let segments = sentences
             .iter()
             .map(|&Range { start, end }| &text[start..end])
