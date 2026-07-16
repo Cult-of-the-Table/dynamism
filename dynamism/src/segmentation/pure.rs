@@ -1,11 +1,17 @@
 use anyhow::Error;
 use fastembed::Embedding;
+use fastembed::{Embedding, TextEmbedding};
+use fastembed::{EmbeddingModel, InitOptions, TextEmbedding};
 use icu_segmenter::{SentenceSegmenter, options::SentenceBreakInvariantOptions};
 use itertools::Itertools;
 use std::ops::Range;
 use std::sync::Arc;
+use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::task::JoinHandle;
 use uuid::Uuid;
 
+use super::model::Batch;
 use crate::Pipeline;
 use crate::segmentation::model::EmbeddedChunk;
 
@@ -29,6 +35,35 @@ pub struct AssemblyInput {
     pub embeds: Vec<Embedding>,
     pub source: Arc<String>,
     pub url: Arc<String>,
+}
+
+impl Pipeline<Receiver<Batch>> {
+    pub async fn embed_loop(self) -> Pipeline<JoinHandle<()>> {
+        self.run_with_logs("Embedding segments...", move |input| {
+            let mut model = TextEmbedding::try_new(
+                InitOptions::new(EmbeddingModel::NomicEmbedTextV15)
+                    .with_show_download_progress(true),
+            )
+            .unwrap();
+            tokio::spawn(async move {
+                let mut buff: Vec<Batch> = Vec::new();
+                while input.recv_many(&mut buff, 1).await > 0 {
+                    let text = buff
+                        .iter()
+                        .map(|s| format!("search_document: {}", s.text))
+                        .collect::<Vec<_>>();
+                    let text = text.iter().map(|s| s.as_str()).collect::<Vec<_>>();
+                    if let Ok(embedding) = model.embed(text, None) {
+                        for (msg, emb) in buff.drain(..).zip(embedding) {
+                            let _ = msg.reply.send(emb);
+                        }
+                    } else {
+                        buff.clear()
+                    }
+                }
+            })
+        })
+    }
 }
 
 impl Pipeline<&str> {

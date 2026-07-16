@@ -3,6 +3,7 @@ use dynamism::db::worker::spawn;
 use dynamism::reqwest::download;
 use dynamism::scraper::parse;
 use dynamism::segmentation::model::{EmbeddingResponse, EmbeddingTask};
+use dynamism::segmentation::pure::*;
 use dynamism::telemetry::TelEvent;
 use dynamism::umap::umap;
 use dynamism::websearch::search;
@@ -34,7 +35,12 @@ async fn init_pipe() -> Result<()> {
 
     let (tel, tel_handle) = dynamism::telemetry::spawn();
     let (batch_tx, batch_rx) = channel(100);
-    let embed_handle = dynamism::segmentation::embed_loop(batch_rx, tel.clone()).await;
+    // maybe update ? by moving embed to its own mod
+    let embed_handle = dynamism::Pipeline::inject(batch_rx)
+        .embed_loop()
+        .await
+        .value;
+
     let (b_tx, b_rx) = tokio::sync::oneshot::channel();
     let _ = tel
         .send(TelEvent::CreateBar {
@@ -51,7 +57,7 @@ async fn init_pipe() -> Result<()> {
         let bar_tx = bar_reply.clone();
         tokio::spawn(async move {
             let EmbeddingTask { source_text, url } = t;
-            let chunks = dynamism::segmentation::segment_pipe_start(&source_text, &url, batch_tx)
+            let chunks = dynamism::segmentation::seegment_pipe_start(&source_text, &url, batch_tx)
                 .await
                 .unwrap();
             tx.send(Ok(EmbeddingResponse { chunks })).await.unwrap();

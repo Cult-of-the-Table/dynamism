@@ -2,6 +2,7 @@ use anyhow::Result;
 use icu::segmenter::SentenceSegmenter;
 use itertools::Itertools;
 
+#[deprecated]
 pub fn segment(text: Vec<String>) -> Result<Vec<Vec<String>>> {
     let segmenter = SentenceSegmenter::new(Default::default());
     let sentances = text
