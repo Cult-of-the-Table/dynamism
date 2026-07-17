@@ -2,6 +2,7 @@ use anyhow::Result;
 use dynamism::db::worker::spawn;
 use dynamism::reqwest::download;
 use dynamism::scraper::parse;
+use dynamism::segmentation::model::EmbeddingResponse;
 use dynamism::segmentation::model::EmbeddingTask;
 use dynamism::umap::FittedChunks;
 use dynamism::umap::umap;
@@ -14,6 +15,7 @@ use lancedb::{
 use serde_arrow;
 use std::env;
 use std::path::PathBuf;
+use tokio::sync::mpsc::channel;
 //use tempfile::tempdir;
 use tokio::task::JoinSet;
 pub async fn read(dir: String) -> Vec<FittedChunks> {
@@ -54,10 +56,35 @@ pub async fn load(query: String) -> Result<()> {
     });
 
     let (tel, tel_handle) = dynamism::telemetry::spawn();
-    let (tx, rx, seg_handle) = dynamism::segmentation::worker::spawn(tel.clone()).await;
+    let (batch_tx, batch_rx) = channel(100);
+    let embed_handle = dynamism::Pipeline::inject(batch_rx)
+        .embed_loop()
+        .await
+        .value;
+
+    //let (b_tx, b_rx) = tokio::sync::oneshot::channel();
+    //    let _ = tel
+    //        .send(TelEvent::CreateBar {
+    //            total: 0,
+    //            style: ProgressStyle::default_bar(),
+    //            reply: b_tx,
+    //        })
+    //        .await;
+    //let bar_reply = b_rx.await.unwrap();
+    let (tx, rx) = channel(10);
     for t in task {
-        tx.send(t).await.unwrap();
+        let batch_tx = batch_tx.clone();
+        let tx = tx.clone();
+        //let bar_tx = bar_reply.clone();
+        tokio::spawn(async move {
+            let EmbeddingTask { source_text, url } = t;
+            let chunks = dynamism::segmentation::segment_pipe_start(&source_text, &url, batch_tx)
+                .await
+                .unwrap();
+            tx.send(Ok(EmbeddingResponse { chunks })).await.unwrap();
+        });
     }
+    drop(batch_tx);
     drop(tx);
     let fitted_chunks = umap(rx, tel.clone()).await?;
     let mut dir: PathBuf = env::current_dir().unwrap();
@@ -69,7 +96,7 @@ pub async fn load(query: String) -> Result<()> {
     );
     drop(tel);
     db_handle.await.unwrap();
-    seg_handle.await.unwrap();
+    embed_handle.await.unwrap();
     tel_handle.await.unwrap();
     Ok(())
 }

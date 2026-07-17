@@ -8,6 +8,7 @@ use dynamism::telemetry::TelEvent;
 use dynamism::umap::umap;
 use dynamism::websearch::search;
 use indicatif::ProgressStyle;
+use tempfile::tempdir;
 use tokio::sync::mpsc::channel;
 use tokio::task::JoinSet;
 #[tokio::test(flavor = "multi_thread")]
@@ -57,7 +58,7 @@ async fn init_pipe() -> Result<()> {
         let bar_tx = bar_reply.clone();
         tokio::spawn(async move {
             let EmbeddingTask { source_text, url } = t;
-            let chunks = dynamism::segmentation::seegment_pipe_start(&source_text, &url, batch_tx)
+            let chunks = dynamism::segmentation::segment_pipe_start(&source_text, &url, batch_tx)
                 .await
                 .unwrap();
             tx.send(Ok(EmbeddingResponse { chunks })).await.unwrap();

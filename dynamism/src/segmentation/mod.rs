@@ -1,8 +1,7 @@
 use anyhow::Error;
 use fastembed::Embedding;
-use fastembed::{EmbeddingModel, InitOptions, TextEmbedding};
 use futures::future::try_join_all;
-use model::EmbeddedChunk;
+use model::{Batch, EmbeddedChunk};
 use pure::*;
 use std::sync::Arc;
 use tokio::sync::mpsc::Sender;
@@ -11,10 +10,6 @@ use tokio::{self, sync};
 pub mod model;
 pub mod pure;
 
-pub struct Batch {
-    text: String,
-    reply: sync::oneshot::Sender<Embedding>,
-}
 pub async fn segment_pipe_start(
     source: &str,
     url: &str,
@@ -36,15 +31,15 @@ pub async fn segment_pipe_start(
         receivers.push(r_rx);
     }
     let embeds = try_join_all(receivers).await.unwrap();
-    let pipeline = crate::Pipeline::inject(AssemblyInput {
+    let pipeline = crate::Pipeline::inject(Ok(AssemblyInput {
         embeds,
         ranges,
         source,
         url,
-    })
+    }))
     .assemble_chunks()
     .merge_chunks(0.1);
-    Ok(pipeline.value)
+    Ok(pipeline.value?)
 }
 
 #[cfg(test)]

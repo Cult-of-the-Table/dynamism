@@ -1,13 +1,10 @@
 use anyhow::Error;
-use fastembed::Embedding;
-use fastembed::{Embedding, TextEmbedding};
-use fastembed::{EmbeddingModel, InitOptions, TextEmbedding};
+use fastembed::{Embedding, EmbeddingModel, InitOptions, TextEmbedding};
 use icu_segmenter::{SentenceSegmenter, options::SentenceBreakInvariantOptions};
 use itertools::Itertools;
 use std::ops::Range;
 use std::sync::Arc;
-use tokio::sync::mpsc::{Receiver, Sender};
-use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::sync::mpsc::Receiver;
 use tokio::task::JoinHandle;
 use uuid::Uuid;
 
@@ -39,7 +36,7 @@ pub struct AssemblyInput {
 
 impl Pipeline<Receiver<Batch>> {
     pub async fn embed_loop(self) -> Pipeline<JoinHandle<()>> {
-        self.run_with_logs("Embedding segments...", move |input| {
+        self.map("Embedding segments...", move |mut input| {
             let mut model = TextEmbedding::try_new(
                 InitOptions::new(EmbeddingModel::NomicEmbedTextV15)
                     .with_show_download_progress(true),
@@ -68,7 +65,7 @@ impl Pipeline<Receiver<Batch>> {
 
 impl Pipeline<&str> {
     pub fn segment(self) -> Pipeline<Result<(Vec<String>, Vec<Range<usize>>), Error>> {
-        self.run_with_logs("Segmenting text...", move |text| {
+        self.map("Segmenting text...", move |text| {
             let segmenter = SentenceSegmenter::new(SentenceBreakInvariantOptions::default());
             let mut ranges = segmenter
                 .segment_str(text)
@@ -87,43 +84,47 @@ impl Pipeline<&str> {
     }
 }
 
-impl Pipeline<AssemblyInput> {
-    pub fn assemble_chunks(self) -> Pipeline<Vec<EmbeddedChunk>> {
-        self.run_with_logs("Assembling chunk types...", move |input| {
-            input
-                .ranges
-                .into_iter()
-                .zip(input.embeds)
-                .map(|(range, embedding)| EmbeddedChunk {
-                    id: Uuid::new_v4(),
-                    source_url: input.url.clone(),
-                    source_text: input.source.clone(),
-                    range,
-                    embedding,
-                })
-                .collect::<Vec<EmbeddedChunk>>()
+impl Pipeline<Result<AssemblyInput, Error>> {
+    pub fn assemble_chunks(self) -> Pipeline<Result<Vec<EmbeddedChunk>, Error>> {
+        self.map("Assembling chunk types...", |res| {
+            res.map(|input| {
+                input
+                    .ranges
+                    .into_iter()
+                    .zip(input.embeds)
+                    .map(|(range, embedding)| EmbeddedChunk {
+                        id: Uuid::new_v4(),
+                        source_url: input.url.clone(),
+                        source_text: input.source.clone(),
+                        range,
+                        embedding,
+                    })
+                    .collect::<Vec<EmbeddedChunk>>()
+            })
         })
     }
 }
-impl Pipeline<Vec<EmbeddedChunk>> {
-    pub fn merge_chunks(self, sigma: f64) -> Pipeline<Vec<EmbeddedChunk>> {
-        self.run_with_logs("Merging vectors...", move |chunks| {
-            if chunks.is_empty() {
-                return vec![];
-            };
-            let mut merged: Vec<EmbeddedChunk> = vec![chunks[0].clone()];
-            for window in chunks.windows(2) {
-                let prev = &window[0];
-                let curr = &window[1];
-                let sim = cosine_similarity(&prev.embedding, &curr.embedding);
-                if sim > 1.0 - sigma {
-                    let last = merged.last_mut().unwrap();
-                    last.range = last.range.start..curr.range.end;
-                } else {
-                    merged.push(curr.clone());
+impl Pipeline<Result<Vec<EmbeddedChunk>, Error>> {
+    pub fn merge_chunks(self, sigma: f64) -> Pipeline<Result<Vec<EmbeddedChunk>, Error>> {
+        self.map("Merging vectors...", |res| {
+            res.map(|chunks| {
+                if chunks.is_empty() {
+                    return vec![];
+                };
+                let mut merged: Vec<EmbeddedChunk> = vec![chunks[0].clone()];
+                for window in chunks.windows(2) {
+                    let prev = &window[0];
+                    let curr = &window[1];
+                    let sim = cosine_similarity(&prev.embedding, &curr.embedding);
+                    if sim > 1.0 - sigma {
+                        let last = merged.last_mut().unwrap();
+                        last.range = last.range.start..curr.range.end;
+                    } else {
+                        merged.push(curr.clone());
+                    }
                 }
-            }
-            merged
+                merged
+            })
         })
     }
 }

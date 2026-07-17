@@ -1,5 +1,5 @@
 pub mod db;
-pub mod embed;
+//pub mod embed;
 pub mod reqwest;
 pub mod scraper;
 pub mod segmentation;
@@ -20,15 +20,23 @@ impl<T> Pipeline<T> {
             logs: Vec::new(),
         }
     }
+    pub fn bind<U, F>(mut self, desc: &str, f: F) -> Pipeline<U>
+    where
+        F: FnOnce(T) -> Pipeline<U>,
+    {
+        self.logs.push(desc.to_string());
+        let mut next = f(self.value);
+        self.logs.append(&mut next.logs);
+        Pipeline {
+            value: next.value,
+            logs: self.logs,
+        }
+    }
 
-    pub fn run_with_logs<U, F>(mut self, desc: &str, f: F) -> Pipeline<U>
+    pub fn map<U, F>(self, desc: &str, f: F) -> Pipeline<U>
     where
         F: FnOnce(T) -> U,
     {
-        self.logs.push(desc.to_string());
-        Pipeline {
-            value: f(self.value),
-            logs: self.logs,
-        }
+        self.bind(desc, |val| Pipeline::inject(f(val)))
     }
 }

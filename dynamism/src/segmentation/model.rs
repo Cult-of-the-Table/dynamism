@@ -3,11 +3,12 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::ops::Range;
 use std::sync::Arc;
+use tokio::sync::oneshot::Sender;
 use uuid::Uuid;
 
 pub struct Batch {
     pub text: String,
-    pub reply: sync::oneshot::Sender<Embedding>,
+    pub reply: Sender<Embedding>,
 }
 
 pub struct EmbeddingTask {
