@@ -39,4 +39,26 @@ impl<T> Pipeline<T> {
     {
         self.bind(desc, |val| Pipeline::inject(f(val)))
     }
+
+    pub async fn bind_async<U, F, Fut>(mut self, desc: &str, f: F) -> Pipeline<U>
+    where
+        F: FnOnce(T) -> Fut,
+        Fut: Future<Output = Pipeline<U>>,
+    {
+        self.logs.push(desc.to_string());
+        let mut next = f(self.value).await;
+        self.logs.append(&mut next.logs);
+        Pipeline {
+            value: next.value,
+            logs: self.logs,
+        }
+    }
+    pub async fn map_async<U, F, Fut>(self, desc: &str, f: F) -> Pipeline<U>
+    where
+        F: FnOnce(T) -> Fut,
+        Fut: Future<Output = U>,
+    {
+        self.bind_async(desc, |val| async { Pipeline::inject(f(val).await) })
+            .await
+    }
 }

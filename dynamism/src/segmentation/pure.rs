@@ -4,11 +4,11 @@ use icu_segmenter::{SentenceSegmenter, options::SentenceBreakInvariantOptions};
 use itertools::Itertools;
 use std::ops::Range;
 use std::sync::Arc;
-use tokio::sync::mpsc::Receiver;
-use tokio::task::JoinHandle;
+use tokio::sync::mpsc;
+use tokio::sync::mpsc::Sender;
+use tokio::sync::oneshot;
 use uuid::Uuid;
 
-use super::model::Batch;
 use crate::Pipeline;
 use crate::segmentation::model::EmbeddedChunk;
 
@@ -33,36 +33,53 @@ pub struct AssemblyInput {
     pub source: Arc<String>,
     pub url: Arc<String>,
 }
-
-impl Pipeline<Receiver<Batch>> {
-    pub async fn embed_loop(self) -> Pipeline<JoinHandle<()>> {
-        self.map("Embedding segments...", move |mut input| {
-            let mut model = TextEmbedding::try_new(
-                InitOptions::new(EmbeddingModel::NomicEmbedTextV15)
-                    .with_show_download_progress(true),
-            )
-            .unwrap();
-            tokio::spawn(async move {
-                let mut buff: Vec<Batch> = Vec::new();
-                while input.recv_many(&mut buff, 1).await > 0 {
-                    let text = buff
-                        .iter()
-                        .map(|s| format!("search_document: {}", s.text))
-                        .collect::<Vec<_>>();
-                    let text = text.iter().map(|s| s.as_str()).collect::<Vec<_>>();
-                    if let Ok(embedding) = model.embed(text, None) {
-                        for (msg, emb) in buff.drain(..).zip(embedding) {
-                            let _ = msg.reply.send(emb);
-                        }
-                    } else {
-                        buff.clear()
-                    }
-                }
-            })
-        })
-    }
+pub struct EmbedRequest {
+    pub text: Vec<String>,
+    pub reply: oneshot::Sender<Result<Vec<Embedding>, Error>>,
 }
 
+pub async fn load_model() -> Result<Sender<EmbedRequest>, Error> {
+    let (tx, mut rx) = mpsc::channel::<EmbedRequest>(32);
+    let (init_tx, init_rx) = oneshot::channel();
+    std::thread::spawn(move || {
+        let mut model = match TextEmbedding::try_new(
+            InitOptions::new(EmbeddingModel::NomicEmbedTextV15).with_show_download_progress(true),
+        ) {
+            Ok(m) => {
+                let _ = init_tx.send(Ok(()));
+                m
+            }
+            Err(e) => {
+                let _ = init_tx.send(Err(e));
+                return;
+            }
+        };
+        while let Some(req) = rx.blocking_recv() {
+            let prefixed: Vec<String> = req
+                .text
+                .iter()
+                .map(|s| format!("search_document: {s}"))
+                .collect();
+            let _ = req.reply.send(model.embed(prefixed, Some(32)));
+        }
+    });
+    init_rx.await??;
+    Ok(tx)
+}
+impl Pipeline<Sender<EmbedRequest>> {
+    pub async fn embed(self, text: Vec<String>) -> Pipeline<Result<Vec<Embedding>, Error>> {
+        self.map_async("Embedding segments...", move |tx| async move {
+            let (reply_tx, reply_rx) = oneshot::channel();
+            tx.send(EmbedRequest {
+                text,
+                reply: reply_tx,
+            })
+            .await?;
+            reply_rx.await?
+        })
+        .await
+    }
+}
 impl Pipeline<&str> {
     pub fn segment(self) -> Pipeline<Result<(Vec<String>, Vec<Range<usize>>), Error>> {
         self.map("Segmenting text...", move |text| {

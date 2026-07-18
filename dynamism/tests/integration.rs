@@ -3,11 +3,9 @@ use dynamism::db::worker::spawn;
 use dynamism::reqwest::download;
 use dynamism::scraper::parse;
 use dynamism::segmentation::model::{EmbeddingResponse, EmbeddingTask};
-use dynamism::segmentation::pure::*;
-use dynamism::telemetry::TelEvent;
+use dynamism::segmentation::{pure::*, segment_pipe_start};
 use dynamism::umap::umap;
 use dynamism::websearch::search;
-use indicatif::ProgressStyle;
 use tempfile::tempdir;
 use tokio::sync::mpsc::channel;
 use tokio::task::JoinSet;
@@ -35,36 +33,17 @@ async fn init_pipe() -> Result<()> {
     });
 
     let (tel, tel_handle) = dynamism::telemetry::spawn();
-    let (batch_tx, batch_rx) = channel(100);
-    // maybe update ? by moving embed to its own mod
-    let embed_handle = dynamism::Pipeline::inject(batch_rx)
-        .embed_loop()
-        .await
-        .value;
-
-    let (b_tx, b_rx) = tokio::sync::oneshot::channel();
-    let _ = tel
-        .send(TelEvent::CreateBar {
-            total: 0,
-            style: ProgressStyle::default_bar(),
-            reply: b_tx,
-        })
-        .await;
-    let bar_reply = b_rx.await.unwrap();
+    let model = load_model().await?;
     let (tx, rx) = channel(10);
     for t in task {
-        let batch_tx = batch_tx.clone();
         let tx = tx.clone();
-        let bar_tx = bar_reply.clone();
+        let model = model.clone();
         tokio::spawn(async move {
             let EmbeddingTask { source_text, url } = t;
-            let chunks = dynamism::segmentation::segment_pipe_start(&source_text, &url, batch_tx)
-                .await
-                .unwrap();
+            let chunks = segment_pipe_start(&source_text, &url, model).await.unwrap();
             tx.send(Ok(EmbeddingResponse { chunks })).await.unwrap();
         });
     }
-    drop(batch_tx);
     drop(tx);
     let fitted_chunks = umap(rx, tel.clone()).await?;
     let dir = tempdir()?;
@@ -75,7 +54,6 @@ async fn init_pipe() -> Result<()> {
     );
     drop(tel);
     db_handle.await.unwrap();
-    embed_handle.await.unwrap();
     tel_handle.await.unwrap();
     Ok(())
 }

@@ -1,11 +1,10 @@
 use anyhow::Error;
-use fastembed::Embedding;
-use futures::future::try_join_all;
-use model::{Batch, EmbeddedChunk};
+use model::EmbeddedChunk;
 use pure::*;
 use std::sync::Arc;
 use tokio::sync::mpsc::Sender;
-use tokio::{self, sync};
+
+use crate::Pipeline;
 
 pub mod model;
 pub mod pure;
@@ -13,24 +12,13 @@ pub mod pure;
 pub async fn segment_pipe_start(
     source: &str,
     url: &str,
-    e_tx: Sender<Batch>,
+    model: Sender<EmbedRequest>,
 ) -> Result<Vec<EmbeddedChunk>, Error> {
     let pipeline = crate::Pipeline::inject(source);
     let (segments, ranges) = pipeline.segment().value?;
     let source = Arc::new(source.to_string());
     let url = Arc::new(url.to_string());
-    let mut receivers = Vec::with_capacity(segments.len());
-    // packages the segments with a receiveer and passes them to the embedding model
-    for seg in segments {
-        let (r_tx, r_rx) = tokio::sync::oneshot::channel();
-        let msg = Batch {
-            text: seg,
-            reply: r_tx,
-        };
-        e_tx.send(msg).await?;
-        receivers.push(r_rx);
-    }
-    let embeds = try_join_all(receivers).await.unwrap();
+    let embeds = Pipeline::inject(model).embed(segments).await.value?;
     let pipeline = crate::Pipeline::inject(Ok(AssemblyInput {
         embeds,
         ranges,
