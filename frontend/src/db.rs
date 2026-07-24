@@ -1,12 +1,12 @@
 use anyhow::Result;
 use dynamism::db::worker::spawn;
+use dynamism::pmap::FittedChunks;
+use dynamism::pmap::pmap;
 use dynamism::reqwest::download;
 use dynamism::scraper::parse;
 use dynamism::segmentation::model::EmbeddingResponse;
 use dynamism::segmentation::model::EmbeddingTask;
 use dynamism::segmentation::pure::load_model;
-use dynamism::umap::FittedChunks;
-use dynamism::umap::umap;
 use dynamism::websearch::search;
 use futures::StreamExt;
 use lancedb::{
@@ -71,7 +71,7 @@ pub async fn load(query: String) -> Result<()> {
         });
     }
     drop(tx);
-    let fitted_chunks = umap(rx, tel.clone()).await?;
+    let fitted_chunks = pmap(rx, tel.clone()).await?;
     let mut dir: PathBuf = env::current_dir().unwrap();
     dir.push("db/");
     let db_handle = spawn(

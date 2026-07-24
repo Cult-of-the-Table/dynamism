@@ -1,5 +1,5 @@
-use crate::umap::FittedChunks;
-use arrow_array::types::Float64Type;
+use crate::pmap::FittedChunks;
+use arrow_array::types::Float32Type;
 use arrow_array::{FixedSizeListArray, RecordBatch, StringArray};
 use arrow_schema::{DataType, Field, Schema};
 use lancedb::Table;
@@ -8,9 +8,9 @@ use tokio::task::JoinHandle;
 
 pub async fn work(schema: Arc<Schema>, table: &Table, chunks: Vec<FittedChunks>) {
     //flatten chunks for fixedsizelistarray ingestion
-    let embeds = FixedSizeListArray::from_iter_primitive::<Float64Type, _, _>(
+    let embeds = FixedSizeListArray::from_iter_primitive::<Float32Type, _, _>(
         chunks.iter().map(|s| {
-            let v: [f64; 2] = s.embeds.into();
+            let v: [f32; 2] = s.embeds.into();
             Some(v.into_iter().map(Some))
         }),
         2,
@@ -41,7 +41,7 @@ pub fn spawn(chunks: Vec<FittedChunks>, dir: String, name: String) -> JoinHandle
         let schema = Arc::new(Schema::new(vec![
             Field::new(
                 "embeds",
-                DataType::FixedSizeList(Arc::new(Field::new("item", DataType::Float64, true)), 2),
+                DataType::FixedSizeList(Arc::new(Field::new("item", DataType::Float32, true)), 2),
                 true,
             ),
             Field::new("url", DataType::Utf8, false),

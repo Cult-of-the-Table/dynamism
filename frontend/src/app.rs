@@ -1,5 +1,5 @@
 use crate::db::{load, read};
-use dynamism::umap::FittedChunks;
+use dynamism::pmap::FittedChunks;
 use iced::Alignment;
 use iced::widget::scrollable;
 use iced::widget::{button, column, container, row, stack, text, text_input};
@@ -93,7 +93,7 @@ impl Dynamism {
                         .as_ref()
                         .unwrap()
                         .iter()
-                        .map(|p| [p.embeds.x, p.embeds.y])
+                        .map(|p| [p.embeds.x as f64, p.embeds.y as f64])
                         .collect(),
                     5.0,
                 )

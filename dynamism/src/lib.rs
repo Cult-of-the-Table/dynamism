@@ -1,5 +1,6 @@
 pub mod db;
 //pub mod embed;
+pub mod pmap;
 pub mod reqwest;
 pub mod scraper;
 pub mod segmentation;
