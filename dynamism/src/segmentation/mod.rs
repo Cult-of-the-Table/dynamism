@@ -13,12 +13,18 @@ pub async fn segment_pipe_start(
     source: &str,
     url: &str,
     model: Sender<EmbedRequest>,
+    query: &str,
 ) -> Result<Vec<EmbeddedChunk>, Error> {
     let pipeline = crate::Pipeline::inject(source);
     let (segments, ranges) = pipeline.segment().value?;
     let source = Arc::new(source.to_string());
     let url = Arc::new(url.to_string());
-    let embeds = Pipeline::inject(model).embed(segments).await.value?;
+    let embeds = Pipeline::inject(&model)
+        .embed(segments)
+        .await
+        .query_filter(&model, &query)
+        .await
+        .value?;
     let pipeline = crate::Pipeline::inject(Ok(AssemblyInput {
         embeds,
         ranges,

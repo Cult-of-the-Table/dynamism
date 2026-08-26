@@ -35,6 +35,7 @@ pub struct AssemblyInput {
 }
 pub struct EmbedRequest {
     pub text: Vec<String>,
+    pub prefix: &'static str,
     pub reply: oneshot::Sender<Result<Vec<Embedding>, Error>>,
 }
 
@@ -58,7 +59,7 @@ pub async fn load_model() -> Result<Sender<EmbedRequest>, Error> {
             let prefixed: Vec<String> = req
                 .text
                 .iter()
-                .map(|s| format!("search_document: {s}"))
+                .map(|s| format!("{}: {s}", req.prefix))
                 .collect();
             let _ = req.reply.send(model.embed(prefixed, Some(32)));
         }
@@ -66,16 +67,41 @@ pub async fn load_model() -> Result<Sender<EmbedRequest>, Error> {
     init_rx.await??;
     Ok(tx)
 }
-impl Pipeline<Sender<EmbedRequest>> {
+impl Pipeline<&Sender<EmbedRequest>> {
     pub async fn embed(self, text: Vec<String>) -> Pipeline<Result<Vec<Embedding>, Error>> {
         self.map_async("Embedding segments...", move |tx| async move {
             let (reply_tx, reply_rx) = oneshot::channel();
             tx.send(EmbedRequest {
                 text,
+                prefix: "clustering",
                 reply: reply_tx,
             })
             .await?;
             reply_rx.await?
+        })
+        .await
+    }
+}
+impl Pipeline<Result<Vec<Embedding>, Error>> {
+    pub async fn query_filter(
+        self,
+        sender: &Sender<EmbedRequest>,
+        query: &str,
+    ) -> Pipeline<Result<Vec<Embedding>, Error>> {
+        self.map_async("Filtering Embeds...", move |embeds| async move {
+            let (reply_tx, reply_rx) = oneshot::channel();
+            sender
+                .send(EmbedRequest {
+                    text: vec![query.to_string()],
+                    prefix: "search_query",
+                    reply: reply_tx,
+                })
+                .await?;
+            let q = reply_rx.await??.remove(0);
+            Ok(embeds?
+                .into_iter()
+                .filter(|c| cosine_similarity(c, &q) >= 0.9)
+                .collect::<Vec<Embedding>>())
         })
         .await
     }

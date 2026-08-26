@@ -40,12 +40,14 @@ async fn init_pipe() -> Result<()> {
         let model = model.clone();
         tokio::spawn(async move {
             let EmbeddingTask { source_text, url } = t;
-            let chunks = segment_pipe_start(&source_text, &url, model).await.unwrap();
+            let chunks = segment_pipe_start(&source_text, &url, model, query)
+                .await
+                .unwrap();
             tx.send(Ok(EmbeddingResponse { chunks })).await.unwrap();
         });
     }
     drop(tx);
-    let fitted_chunks = umap(rx, tel.clone()).await?;
+    let fitted_chunks = pmap(rx, tel.clone()).await?;
     let dir = tempdir()?;
     let db_handle = spawn(
         fitted_chunks,

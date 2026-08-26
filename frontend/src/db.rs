@@ -62,11 +62,17 @@ pub async fn load(query: String) -> Result<()> {
     for t in task {
         let tx = tx.clone();
         let model = model.clone();
+        let query = query.clone();
         tokio::spawn(async move {
             let EmbeddingTask { source_text, url } = t;
-            let chunks = dynamism::segmentation::segment_pipe_start(&source_text, &url, model)
-                .await
-                .unwrap();
+            let chunks = dynamism::segmentation::segment_pipe_start(
+                &source_text,
+                &url,
+                model,
+                query.as_ref(),
+            )
+            .await
+            .unwrap();
             tx.send(Ok(EmbeddingResponse { chunks })).await.unwrap();
         });
     }
