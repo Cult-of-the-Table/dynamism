@@ -94,21 +94,18 @@ async fn chunk(
         return Ok(vec![]);
     }
 
-    {
-        let mut merged: Vec<EmbeddedChunk> = vec![embedded_chunks[0].clone()];
+    let mut merged: Vec<EmbeddedChunk> = vec![embedded_chunks[0].clone()];
 
-        // rolls a window over chunk pairs and merges them if their embedding is similar
-        for window in embedded_chunks.windows(2) {
-            let prev = &window[0];
-            let curr = &window[1];
-            let sim = cosine_similarity(&prev.embedding, &curr.embedding);
+    for window in embedded_chunks.windows(2) {
+        let prev = &window[0];
+        let curr = &window[1];
+        let sim = cosine_similarity(&prev.embedding, &curr.embedding);
 
-            if sim > 1.0 - sigma {
-                let last = merged.last_mut().unwrap();
-                last.range = last.range.start..curr.range.end;
-            } else {
-                merged.push(curr.clone());
-            }
+        if sim > 1.0 - sigma {
+            let last = merged.last_mut().unwrap();
+            last.range = last.range.start..curr.range.end;
+        } else {
+            merged.push(curr.clone());
         }
     }
 

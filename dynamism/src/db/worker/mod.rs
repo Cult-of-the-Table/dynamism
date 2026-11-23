@@ -38,6 +38,7 @@ pub fn spawn(chunks: Vec<FittedChunks>, dir: String, name: String) -> JoinHandle
     // connect, schema, create table, load data
     tokio::spawn(async move {
         let db = lancedb::connect((&dir).as_str()).execute().await.unwrap();
+        db.drop_all_tables(&[]).await.unwrap();
         let schema = Arc::new(Schema::new(vec![
             Field::new(
                 "embeds",
