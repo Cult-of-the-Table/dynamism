@@ -107,8 +107,8 @@ async fn chunk(
         } else {
             merged.push(curr.clone());
         }
-        Ok(merged)
     }
+    Ok(merged)
 }
 async fn segment(s: &str) -> Result<Vec<Range<usize>>, Error> {
     let segmenter = SentenceSegmenter::new(SentenceBreakInvariantOptions::default());
