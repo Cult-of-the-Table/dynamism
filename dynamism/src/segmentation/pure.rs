@@ -100,7 +100,7 @@ impl Pipeline<Result<Vec<Embedding>, Error>> {
             let q = reply_rx.await??.remove(0);
             Ok(embeds?
                 .into_iter()
-                .filter(|c| cosine_similarity(c, &q) >= 0.9)
+                .filter(|c| cosine_similarity(c, &q) >= 0.7)
                 .collect::<Vec<Embedding>>())
         })
         .await
