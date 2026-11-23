@@ -19,12 +19,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "366ffbaa4442f4684d91e2cd7c5ea7c4ed8add41959a31447066e279e432b618"
 
 [[package]]
-name = "accelerate-src"
-version = "0.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "415ed64958754dbe991900f3940677e6a7eefb4d7367afd70d642677b0c7d19d"
-
-[[package]]
 name = "addr2line"
 version = "0.25.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1710,12 +1704,10 @@ version = "0.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6bd9895436c1ba5dc1037a19935d084b838db066ff4e15ef7dded020b7c12a4a"
 dependencies = [
- "accelerate-src",
  "byteorder",
  "float8 0.7.0",
  "gemm",
  "half",
- "libc",
  "libm",
  "memmap2",
  "num-traits",
@@ -4000,7 +3992,6 @@ dependencies = [
  "arrow-array",
  "arrow-schema",
  "burn",
- "candle-core 0.10.2",
  "crossbeam-channel",
  "fast-umap",
  "fastembed",
@@ -4010,13 +4001,11 @@ dependencies = [
  "indicatif",
  "itertools 0.14.0",
  "lancedb",
- "ort",
  "readability-rust",
  "reqwest 0.13.2",
  "sanitize_html",
  "scraper 0.25.0",
  "serde",
- "tempfile",
  "tokio",
  "uuid",
  "websearch",
@@ -4647,15 +4636,12 @@ name = "frontend"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "arrow-array",
- "crossbeam-channel",
  "dynamism",
  "futures",
  "iced",
  "iced_plot",
  "lancedb",
  "serde_arrow",
- "tempfile",
  "tokio",
 ]
 

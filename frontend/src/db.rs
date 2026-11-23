@@ -14,7 +14,7 @@ use lancedb::{
 use serde_arrow;
 use std::env;
 use std::path::PathBuf;
-use tempfile::tempdir;
+//use tempfile::tempdir;
 use tokio::task::JoinSet;
 pub async fn read(dir: String) -> Vec<FittedChunks> {
     let db = lancedb::connect(&dir).execute().await.unwrap();

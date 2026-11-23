@@ -4,7 +4,15 @@ use burn::backend::Autodiff;
 use burn::backend::wgpu::CubeBackend;
 use burn::backend::wgpu::WgpuRuntime;
 use crossbeam_channel;
-use fast_umap::{self, GraphParams, ManifoldParams, Metric, OptimizationParams, Umap, UmapConfig};
+use fast_umap::{
+    self,
+    GraphParams,
+    //ManifoldParams,
+    Metric,
+    OptimizationParams,
+    Umap,
+    UmapConfig,
+};
 use indicatif::ProgressStyle;
 use std::sync::Arc;
 use tokio::sync::mpsc::{Receiver, Sender};
@@ -94,11 +102,11 @@ pub async fn umap(
     let new_embeds = fitted.embedding();
     let fitted_chunks = new_embeds
         .iter()
-        .zip(u.into_iter())
-        .zip(t.into_iter())
-        .zip(ct.into_iter())
+        .zip(u)
+        .zip(t)
+        .zip(ct)
         .map(|(((embeds, url), _text), snippet)| {
-            let mut iter = embeds.iter().map(|&s| s as f64);
+            let mut iter = embeds.iter().copied();
             let coords = Coords {
                 x: iter.next().unwrap_or(0.0),
                 y: iter.next().unwrap_or(0.0),

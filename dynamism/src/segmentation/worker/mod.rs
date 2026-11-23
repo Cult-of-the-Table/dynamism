@@ -1,9 +1,12 @@
 use anyhow::Result;
-use candle_core::{DType, Device};
-use fastembed::NomicV2MoeTextEmbedding;
+//use candle_core::{DType, Device};
+//use fastembed::NomicV2MoeTextEmbedding;
 use fastembed::{EmbeddingModel, InitOptions, TextEmbedding};
-use indicatif::{ProgressBar, ProgressDrawTarget, ProgressStyle};
-use std::time::Duration;
+use indicatif::{
+    //ProgressBar, ProgressDrawTarget,
+    ProgressStyle,
+};
+//use std::time::Duration;
 use tokio::sync::mpsc::{Receiver, Sender, channel};
 use tokio::task::JoinHandle;
 

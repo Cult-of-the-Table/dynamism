@@ -4,7 +4,10 @@ use websearch::{
     multi_provider::{
         MultiProviderConfig, MultiProviderSearch, MultiProviderStrategy, SearchOptionsMulti,
     },
-    providers::{ArxivProvider, DuckDuckGoProvider},
+    providers::{
+        //ArxivProvider,
+        DuckDuckGoProvider,
+    },
 };
 
 pub async fn search(query: &str) -> Result<Vec<SearchResult>, SearchError> {
