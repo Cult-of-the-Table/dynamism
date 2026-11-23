@@ -82,6 +82,11 @@ impl Dynamism {
                 return task;
             }
             Message::DB(chunks) => {
+                if let Some(id) = self.series_id.take() {
+                    let _ = self.widget.remove_series(&id);
+                }
+                self.picked_index = None;
+                self.widget.clear_pick();
                 self.points = Some(chunks);
                 let series = Series::circles(
                     self.points
@@ -159,10 +164,10 @@ impl Dynamism {
         let graph = graph_row.width(Length::Fill).height(Length::Fill);
 
         let input = container(row![
-            text_input("test", &self.content)
+            text_input("enter query", &self.content)
                 .on_input(Message::ContentChanged)
                 .width(200),
-            button("test").on_press(Message::ButtonPressed)
+            button("search").on_press(Message::ButtonPressed)
         ])
         .width(Length::Fill)
         .height(Length::Fill)
