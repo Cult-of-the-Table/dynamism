@@ -82,13 +82,13 @@ impl Pipeline<&Sender<EmbedRequest>> {
         .await
     }
 }
-impl Pipeline<Result<Vec<Embedding>, Error>> {
+impl Pipeline<Result<Vec<EmbeddedChunk>, Error>> {
     pub async fn query_filter(
         self,
         sender: &Sender<EmbedRequest>,
         query: &str,
-    ) -> Pipeline<Result<Vec<Embedding>, Error>> {
-        self.map_async("Filtering Embeds...", move |embeds| async move {
+    ) -> Pipeline<Result<Vec<EmbeddedChunk>, Error>> {
+        self.map_async("Filtering Embeds...", move |chunks| async move {
             let (reply_tx, reply_rx) = oneshot::channel();
             sender
                 .send(EmbedRequest {
@@ -98,10 +98,10 @@ impl Pipeline<Result<Vec<Embedding>, Error>> {
                 })
                 .await?;
             let q = reply_rx.await??.remove(0);
-            Ok(embeds?
+            Ok(chunks?
                 .into_iter()
-                .filter(|c| cosine_similarity(c, &q) >= 0.7)
-                .collect::<Vec<Embedding>>())
+                .filter(|c| cosine_similarity(&c.embedding, &q) >= 0.7)
+                .collect::<Vec<EmbeddedChunk>>())
         })
         .await
     }

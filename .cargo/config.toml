@@ -1,8 +1,0 @@
-# Build OpenBLAS (from source, via openblas-src) using GCC rather than the
-# default compiler. On macOS the default is Apple Clang, which cannot resolve
-# `-lgfortran` (Homebrew keeps GCC runtime libs in a versioned directory
-# outside clang's search path), breaking the OpenBLAS build with
-# "ld: library 'gfortran' not found". The GCC driver links its own runtime
-# correctly. On Linux this matches the default toolchain, so it is a no-op.
-[env]
-OPENBLAS_CC = "gcc"

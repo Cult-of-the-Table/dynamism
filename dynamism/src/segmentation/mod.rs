@@ -19,12 +19,7 @@ pub async fn segment_pipe_start(
     let (segments, ranges) = pipeline.segment().value?;
     let source = Arc::new(source.to_string());
     let url = Arc::new(url.to_string());
-    let embeds = Pipeline::inject(&model)
-        .embed(segments)
-        .await
-        .query_filter(&model, &query)
-        .await
-        .value?;
+    let embeds = Pipeline::inject(&model).embed(segments).await.value?;
     let pipeline = crate::Pipeline::inject(Ok(AssemblyInput {
         embeds,
         ranges,
@@ -32,7 +27,9 @@ pub async fn segment_pipe_start(
         url,
     }))
     .assemble_chunks()
-    .merge_chunks(0.1);
+    .merge_chunks(0.1)
+    .query_filter(&model, query)
+    .await;
     Ok(pipeline.value?)
 }
 
