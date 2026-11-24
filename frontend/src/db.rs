@@ -1,10 +1,12 @@
 use anyhow::Result;
 use dynamism::db::worker::spawn;
+use dynamism::pmap::FittedChunks;
+use dynamism::pmap::pmap;
 use dynamism::reqwest::download;
 use dynamism::scraper::parse;
-use dynamism::segmentation::worker::model::EmbeddingTask;
-use dynamism::umap::FittedChunks;
-use dynamism::umap::umap;
+use dynamism::segmentation::model::EmbeddingResponse;
+use dynamism::segmentation::model::EmbeddingTask;
+use dynamism::segmentation::pure::load_model;
 use dynamism::websearch::search;
 use futures::StreamExt;
 use lancedb::{
@@ -14,6 +16,7 @@ use lancedb::{
 use serde_arrow;
 use std::env;
 use std::path::PathBuf;
+use tokio::sync::mpsc::channel;
 //use tempfile::tempdir;
 use tokio::task::JoinSet;
 pub async fn read(dir: String) -> Vec<FittedChunks> {
@@ -54,12 +57,27 @@ pub async fn load(query: String) -> Result<()> {
     });
 
     let (tel, tel_handle) = dynamism::telemetry::spawn();
-    let (tx, rx, seg_handle) = dynamism::segmentation::worker::spawn(tel.clone()).await;
+    let (tx, rx) = channel(10);
+    let model = load_model().await?;
     for t in task {
-        tx.send(t).await.unwrap();
+        let tx = tx.clone();
+        let model = model.clone();
+        let query = query.clone();
+        tokio::spawn(async move {
+            let EmbeddingTask { source_text, url } = t;
+            let chunks = dynamism::segmentation::segment_pipe_start(
+                &source_text,
+                &url,
+                model,
+                query.as_ref(),
+            )
+            .await
+            .unwrap();
+            tx.send(Ok(EmbeddingResponse { chunks })).await.unwrap();
+        });
     }
     drop(tx);
-    let fitted_chunks = umap(rx, tel.clone()).await?;
+    let fitted_chunks = pmap(rx, tel.clone()).await?;
     let mut dir: PathBuf = env::current_dir().unwrap();
     dir.push("db/");
     let db_handle = spawn(
@@ -69,7 +87,6 @@ pub async fn load(query: String) -> Result<()> {
     );
     drop(tel);
     db_handle.await.unwrap();
-    seg_handle.await.unwrap();
     tel_handle.await.unwrap();
     Ok(())
 }

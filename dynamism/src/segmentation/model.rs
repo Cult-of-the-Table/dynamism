@@ -1,11 +1,24 @@
+use fastembed::Embedding;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::ops::Range;
 use std::sync::Arc;
-
-use serde::{Deserialize, Serialize};
+use tokio::sync::oneshot::Sender;
 use uuid::Uuid;
 
-use fastembed::Embedding;
+pub struct Batch {
+    pub text: String,
+    pub reply: Sender<Embedding>,
+}
+
+pub struct EmbeddingTask {
+    pub source_text: String,
+    pub url: String,
+}
+
+pub struct EmbeddingResponse {
+    pub chunks: Vec<EmbeddedChunk>,
+}
 
 #[derive(Clone, Debug, Default)]
 pub struct EmbeddedChunk {

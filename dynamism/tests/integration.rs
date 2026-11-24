@@ -2,10 +2,12 @@ use anyhow::Result;
 use dynamism::db::worker::spawn;
 use dynamism::reqwest::download;
 use dynamism::scraper::parse;
-use dynamism::segmentation::worker::model::EmbeddingTask;
+use dynamism::segmentation::model::{EmbeddingResponse, EmbeddingTask};
+use dynamism::segmentation::{pure::*, segment_pipe_start};
 use dynamism::umap::umap;
 use dynamism::websearch::search;
 use tempfile::tempdir;
+use tokio::sync::mpsc::channel;
 use tokio::task::JoinSet;
 #[tokio::test(flavor = "multi_thread")]
 async fn init_pipe() -> Result<()> {
@@ -31,12 +33,21 @@ async fn init_pipe() -> Result<()> {
     });
 
     let (tel, tel_handle) = dynamism::telemetry::spawn();
-    let (tx, rx, seg_handle) = dynamism::segmentation::worker::spawn(tel.clone()).await;
+    let model = load_model().await?;
+    let (tx, rx) = channel(10);
     for t in task {
-        tx.send(t).await.unwrap();
+        let tx = tx.clone();
+        let model = model.clone();
+        tokio::spawn(async move {
+            let EmbeddingTask { source_text, url } = t;
+            let chunks = segment_pipe_start(&source_text, &url, model, query)
+                .await
+                .unwrap();
+            tx.send(Ok(EmbeddingResponse { chunks })).await.unwrap();
+        });
     }
     drop(tx);
-    let fitted_chunks = umap(rx, tel.clone()).await?;
+    let fitted_chunks = pmap(rx, tel.clone()).await?;
     let dir = tempdir()?;
     let db_handle = spawn(
         fitted_chunks,
@@ -45,7 +56,6 @@ async fn init_pipe() -> Result<()> {
     );
     drop(tel);
     db_handle.await.unwrap();
-    seg_handle.await.unwrap();
     tel_handle.await.unwrap();
     Ok(())
 }
